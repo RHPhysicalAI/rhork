@@ -1,0 +1,7 @@
+tmp/
+.DS_Store
+.playwright-mcp/
+
+# Helm
+charts/*/charts/
+*.tgz

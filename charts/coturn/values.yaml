@@ -1,0 +1,26 @@
+image:
+  repository: coturn/coturn
+  tag: latest
+  pullPolicy: IfNotPresent
+
+initImage:
+  repository: registry.access.redhat.com/ubi10/ubi-minimal
+  tag: latest
+
+credentials:
+  username: gzsim
+  password: gzsimpass
+  realm: gz-sim.local
+
+ports:
+  listening: 3478
+  minRelay: 49152
+  maxRelay: 49252
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi

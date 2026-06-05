@@ -1,0 +1,42 @@
+# gz-sim-streamer: Gazebo Sim with CameraStream plugin
+# Supports NVIDIA GPU, AMD GPU, or CPU-only (Mesa llvmpipe) rendering.
+# GPU selection happens at the pod level, not in this image.
+#
+# Base: official Gazebo OCI image (Ubuntu-based) - gz-sim RPMs
+# don't exist for RHEL/CentOS, so UBI can't be used here.
+
+# ---- Build stage ----
+FROM ghcr.io/openrobotics/gazebo:rotary-full AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake g++ make pkg-config \
+    libgz-sim-dev \
+    libgz-rendering-dev libgz-transport-dev \
+    libgz-msgs-dev libgz-common-dev libgz-plugin-dev \
+    libavcodec-dev libavformat-dev libswscale-dev libavutil-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY src/ /build/src/
+COPY CMakeLists.txt /build/
+RUN cmake -B /build/out /build && cmake --build /build/out
+
+# ---- Runtime stage ----
+FROM ghcr.io/openrobotics/gazebo:rotary-full
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libx264-dev \
+    mesa-utils libegl-mesa0 libgl1-mesa-dri mesa-vulkan-drivers \
+    libgbm1 libxkbcommon0 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /build/out/libgz-sim-camera-stream-system.so /usr/local/lib/
+COPY quadcopter_demo.sdf headless_camera.sdf /worlds/
+COPY fly_patrol.sh /usr/local/bin/fly_patrol.sh
+
+ENV GZ_SIM_SYSTEM_PLUGIN_PATH=/usr/local/lib
+ENV GZ_FUEL_CACHE_PATH=/fuel-cache
+
+EXPOSE 9002
+
+ENTRYPOINT ["gz", "sim", "-s", "-r", "--headless-rendering"]
+CMD ["/worlds/quadcopter_demo.sdf", "-v", "4"]

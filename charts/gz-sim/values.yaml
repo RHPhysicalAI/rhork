@@ -1,0 +1,39 @@
+engineer: ""
+
+world: quadcopter_demo
+customWorldConfigMap: ""
+
+image:
+  repository: quay.io/gz-sim/gz-sim-streamer
+  tag: latest
+  pullPolicy: IfNotPresent
+
+gpu:
+  vendor: none    # none | nvidia | amd
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 2Gi
+  limits:
+    cpu: "4"
+    memory: 4Gi
+
+mediamtx:
+  host: mediamtx-webrtc.gz-sim.svc.cluster.local
+  port: 8889
+  rtspPort: 8554
+
+gazebo:
+  bitrate: 4000000
+  fps: 30
+  verbosity: 4
+
+persistence:
+  enabled: true
+  keep: true
+  size: 5Gi
+  storageClass: ""
+
+route:
+  enabled: true

@@ -1,0 +1,21 @@
+image:
+  repository: bluenviron/mediamtx
+  tag: latest
+  pullPolicy: IfNotPresent
+
+coturn:
+  host: ""
+  port: 3478
+  username: gzsim
+  password: gzsimpass
+
+route:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

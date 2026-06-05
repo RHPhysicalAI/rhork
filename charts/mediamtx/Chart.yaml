@@ -1,0 +1,5 @@
+apiVersion: v2
+name: mediamtx
+description: MediaMTX streaming server for Gazebo camera streams
+version: 0.1.0
+appVersion: "1.18"

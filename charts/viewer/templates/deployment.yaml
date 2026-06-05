@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "viewer.fullname" . }}
+  labels:
+    {{- include "viewer.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "viewer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "viewer.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+      - name: viewer
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: MEDIAMTX_BASE
+          value: {{ .Values.mediamtx.base | quote }}
+        - name: MEDIAMTX_API
+          value: {{ .Values.mediamtx.api | quote }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}

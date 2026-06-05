@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "coturn.fullname" . }}
+  labels:
+    {{- include "coturn.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: coturn
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: coturn
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: coturn
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      initContainers:
+      - name: discover-ip
+        image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
+        command: ["sh", "-c"]
+        args:
+        - |
+          while read line; do echo "${line//__NODE_EXTERNAL_IP__/$NODE_IP}"; done \
+            < /config-template/turnserver.conf > /config/turnserver.conf
+        env:
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+        - name: config-template
+          mountPath: /config-template
+        - name: config-rendered
+          mountPath: /config
+      containers:
+      - name: coturn
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        args:
+        - "-c"
+        - "/config/turnserver.conf"
+        ports:
+        - containerPort: {{ .Values.ports.listening }}
+          protocol: UDP
+        - containerPort: {{ .Values.ports.listening }}
+          protocol: TCP
+        volumeMounts:
+        - name: config-rendered
+          mountPath: /config
+          readOnly: true
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      volumes:
+      - name: config-template
+        configMap:
+          name: {{ include "coturn.fullname" . }}-config
+      - name: config-rendered
+        emptyDir: {}

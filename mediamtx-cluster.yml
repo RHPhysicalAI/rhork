@@ -1,0 +1,40 @@
+# MediaMTX configuration for OpenShift cluster deployment.
+#
+# Key differences from local mediamtx-gazebo.yml:
+# - No IPv4 loopback restriction (pods communicate over cluster network)
+# - Wider path pattern for namespaced streams (engineer/camera)
+# - No runOnDemand (Gazebo pods push directly via WHIP)
+# - ICE servers configured to point at coturn TURN relay
+
+logLevel: info
+
+api: yes
+apiAddress: :9997
+
+rtsp: yes
+rtspAddress: :8554
+
+webrtc: yes
+webrtcAddress: :8889
+
+# Bind all interfaces - cluster networking handles routing
+webrtcLocalUDPAddress: ""
+webrtcIPsFromInterfaces: yes
+webrtcAdditionalHosts: []
+
+# TURN server for relaying WebRTC media through the cluster boundary.
+# Values are templated by Helm - __COTURN_HOST__ and __COTURN_PORT__
+# are replaced at ConfigMap creation time.
+webrtcICEServers2:
+  - url: turn:__COTURN_HOST__:__COTURN_PORT__
+    username: gzsim
+    password: gzsimpass
+
+hls: yes
+hlsAddress: :8888
+
+pathDefaults:
+
+paths:
+  # Match any path - namespaced (engineer/camera) or simple (camera)
+  ~^(.+)$:

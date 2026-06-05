@@ -1,0 +1,19 @@
+image:
+  repository: quay.io/gz-sim/gz-viewer
+  tag: latest
+  pullPolicy: IfNotPresent
+
+mediamtx:
+  base: ""
+  api: ""
+
+route:
+  enabled: true
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi

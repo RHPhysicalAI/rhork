@@ -1,0 +1,101 @@
+{{- if not .Values.engineer }}
+{{- fail "engineer is required: --set engineer=<name>" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gzsim.fullname" . }}
+  labels:
+    {{- include "gzsim.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "gzsim.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gzsim.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- if eq .Values.gpu.vendor "nvidia" }}
+      runtimeClassName: nvidia
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      {{- else if eq .Values.gpu.vendor "amd" }}
+      nodeSelector:
+        amd.com/gpu.present: "true"
+      securityContext:
+        supplementalGroups: [44]
+      {{- end }}
+      containers:
+      - name: gazebo
+        image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        command: ["gz", "sim", "-s", "-r", "--headless-rendering"]
+        args:
+        - "/worlds/{{ .Values.world }}.sdf"
+        - "-v"
+        - "{{ .Values.gazebo.verbosity }}"
+        env:
+        - name: GZ_SIM_SYSTEM_PLUGIN_PATH
+          value: /usr/local/lib
+        - name: GZ_FUEL_CACHE_PATH
+          value: /fuel-cache
+        - name: STREAM_PREFIX
+          value: {{ .Values.engineer | quote }}
+        - name: MEDIAMTX_WHIP_BASE
+          value: "rtsp://{{ .Values.mediamtx.host }}:{{ .Values.mediamtx.rtspPort }}"
+        {{- if eq .Values.gpu.vendor "none" }}
+        - name: LIBGL_ALWAYS_SOFTWARE
+          value: "1"
+        - name: MESA_GL_VERSION_OVERRIDE
+          value: "3.3"
+        - name: GALLIUM_DRIVER
+          value: llvmpipe
+        {{- end }}
+        ports:
+        - containerPort: 9002
+          name: ws
+        volumeMounts:
+        {{- if .Values.persistence.enabled }}
+        - name: fuel-cache
+          mountPath: /fuel-cache
+        {{- end }}
+        {{- if .Values.customWorldConfigMap }}
+        - name: custom-world
+          mountPath: /worlds/{{ .Values.world }}.sdf
+          subPath: {{ .Values.world }}.sdf
+        {{- end }}
+        resources:
+          {{- if eq .Values.gpu.vendor "nvidia" }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu | quote }}
+            memory: {{ .Values.resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+            memory: {{ .Values.resources.limits.memory | quote }}
+            nvidia.com/gpu: 1
+          {{- else if eq .Values.gpu.vendor "amd" }}
+          requests:
+            cpu: {{ .Values.resources.requests.cpu | quote }}
+            memory: {{ .Values.resources.requests.memory | quote }}
+          limits:
+            cpu: {{ .Values.resources.limits.cpu | quote }}
+            memory: {{ .Values.resources.limits.memory | quote }}
+            amd.com/gpu: 1
+          {{- else }}
+          {{- toYaml .Values.resources | nindent 10 }}
+          {{- end }}
+      volumes:
+      {{- if .Values.persistence.enabled }}
+      - name: fuel-cache
+        persistentVolumeClaim:
+          claimName: {{ .Values.engineer }}-fuel-cache
+      {{- end }}
+      {{- if .Values.customWorldConfigMap }}
+      - name: custom-world
+        configMap:
+          name: {{ .Values.customWorldConfigMap }}
+      {{- end }}
