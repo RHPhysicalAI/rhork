@@ -1,175 +1,272 @@
-# gz-camera-stream
+# rhork
 
-A world-level system plugin for Gazebo Sim that streams H.264 video from camera sensors to a media server via WHIP or RTSP. Frames are captured in the PostRender callback, converted from RGB/RGBA to YUV420P, encoded with libx264 (ultrafast/zerolatency), and pushed to the configured endpoint. The plugin is idle by default and activates on demand through a gz-transport control topic.
+A distributed robotics simulation platform that gives each engineer an isolated [Gazebo Sim](https://gazebosim.org/) instance with live camera streaming to a browser via WebRTC. Simulations run headless on Kubernetes/OpenShift with optional GPU acceleration, while a shared media infrastructure handles video relay, NAT traversal, and a web-based viewer with real-time telemetry.
 
-## How it works
+## Why
 
-```
-Gazebo (OGRE2 render) -> PostRender callback -> RGB->YUV420P (swscale) -> H.264 (libx264) -> WHIP or RTSP -> Media Server
-```
+Robotics simulation is compute-heavy, latency-sensitive, and typically locked to a single developer's workstation. rhork moves simulation to the cluster so that:
 
-The plugin registers a `PostRender` event handler that fires after each render pass. For each active stream, it copies the camera image, queues it into a lock-free SPSC ring buffer, and a dedicated encoder thread picks it up, scales it, encodes it, and writes the packet to the output. One encoder thread per stream - they sleep on a condition variable when idle and never block the render thread.
+- Engineers get isolated sim environments without GPU workstations
+- Camera feeds stream to any browser with sub-second latency via WebRTC
+- Shared infrastructure (media server, TURN relay, viewer) is deployed once
+- Sims scale independently - spin up a new one with a single Helm install
+- Fuel model caches persist across restarts so large worlds don't re-download
 
-### Output protocols
-
-The plugin auto-detects the output protocol from the URL scheme:
-
-| URL scheme | Protocol | FFmpeg muxer | Notes |
-|-----------|----------|-------------|-------|
-| `http://` / `https://` | WHIP | `whip` | WebRTC HTTP Ingest Protocol. Requires FFmpeg 7+ with the WHIP muxer compiled in. Lowest latency path to WebRTC viewers. |
-| `rtsp://` | RTSP | `rtsp` | Real Time Streaming Protocol. Available in all FFmpeg builds. Uses TCP transport in container environments for reliability. MediaMTX converts to WebRTC/HLS automatically. |
-
-If the WHIP muxer isn't available in the FFmpeg build (common with distro packages), the plugin logs a clear error and suggests using an `rtsp://` URL instead. Both protocols deliver H.264 to MediaMTX, which handles conversion to WebRTC (WHEP), HLS, or RTMP for downstream consumers.
-
-## Plugin architecture
+## Architecture
 
 ```
-src/
-  CameraStream.hh/.cc     World-level system plugin (ISystemConfigure + ISystemPostUpdate)
-  StreamContext.hh/.cc     Per-stream FFmpeg encoder + network output
-  FrameQueue.hh            Lock-free SPSC ring buffer (render thread -> encoder thread)
+                             ┌───────────────────────────────────────┐
+                             │           Kubernetes Cluster           │
+                             │           Namespace: gz-sim            │
+                             │                                        │
+  Browser                    │  ┌──────────┐    RTSP / WHIP           │
+  ── WHEP (HTTPS) ──────────────>│ MediaMTX │<──────────── Gazebo (alice)
+  ── API  (HTTPS) ──────────────>│   :8889  │<──────────── Gazebo (bob)
+                             │  │   :9997  │<──────────── Gazebo (carol)
+                             │  └──────────┘                          │
+                             │       │ ICE candidates                 │
+                             │       v (point to coturn)              │
+                             │  ┌──────────┐                          │
+  ── UDP media (TURN) ──────────>│  coturn  │  hostNetwork             │
+  ── TURN/TCP fallback ─────────>│  :3478   │                          │
+                             │  │  :49152- │                          │
+                             │  │   49252  │                          │
+                             │  └──────────┘                          │
+                             │                                        │
+  ── viewer.html (HTTPS) ──────> nginx :8080                          │
+  ── WebSocket  (WSS) ─────────> Gazebo :9002 (per-engineer)          │
+                             │                                        │
+                             └───────────────────────────────────────┘
 ```
 
-### CameraStream (world plugin)
+### Streaming pipeline
 
-Implements `ISystemConfigure` and `ISystemPostUpdate`. On `Configure()`, it reads SDF parameters and subscribes to the control topic (both as a topic subscriber and a service, so it works from CLI and WebSocket). On `PostRender()`, it iterates active streams, lazy-initializes camera pointers by matching sensor names (supports short names, scoped names, and suffix matching against the rendering scene), copies frames, and pushes them into each stream's ring buffer. Failed streams are reaped automatically after 30 consecutive write failures.
-
-### StreamContext (per-stream encoder)
-
-Each `StreamContext` owns a dedicated encoder thread and the full FFmpeg pipeline: `AVCodecContext` (libx264, ultrafast/zerolatency), `SwsContext` (RGB/RGBA to YUV420P), and `AVFormatContext` (WHIP or RTSP output). The sws context is created lazily on the first frame to detect the actual pixel format (3-channel RGB vs 4-channel RGBA) from the rendering backend. WHIP connections retry up to 3 times with 2-second delays to handle DTLS port reuse after a prior session.
-
-### FrameQueue (render-to-encoder bridge)
-
-A 3-slot SPSC ring buffer. The render thread calls `TryPush()` which never blocks - if the encoder is behind, the oldest frame is overwritten (frame dropping over blocking). The encoder thread calls `WaitAndPop()` which blocks on a condition variable until a frame is available or a timeout expires. This keeps encoder threads at near-zero CPU when no frames are being produced.
-
-## SDF configuration
-
-Add the plugin to any Gazebo world:
-
-```xml
-<plugin filename="gz-sim-camera-stream-system"
-        name="gz::sim::systems::CameraStream">
-  <topic>/stream/control</topic>
-  <default_bitrate>4000000</default_bitrate>
-  <default_fps>30</default_fps>
-  <stream_prefix>my_robot</stream_prefix>
-  <mediamtx_base>rtsp://mediamtx:8554</mediamtx_base>
-</plugin>
+```
+Gazebo PostRender -> RGB/RGBA -> YUV420P (swscale) -> H.264 (libx264) -> RTSP/WHIP -> MediaMTX -> WebRTC (WHEP) -> Browser
 ```
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `topic` | `/stream/control` | gz-transport topic and service for stream start/stop commands |
-| `default_bitrate` | `4000000` | H.264 encoding bitrate in bps |
-| `default_fps` | `30` | Encoding framerate |
-| `stream_prefix` | *(none)* | Path prefix prepended to all stream URLs (e.g., `my_robot` produces `rtsp://host/my_robot/cam1`). Also reads from `STREAM_PREFIX` env var. |
-| `mediamtx_base` | *(none)* | Base URL for the media server. When set, the plugin constructs output URLs internally instead of requiring them in the start command. Also reads from `MEDIAMTX_WHIP_BASE` env var. |
+Video capture and encoding are handled by the [gz-camera-stream](https://github.com/TODO/gz-camera-stream) plugin, a world-level Gazebo system plugin that hooks into the render loop, encodes frames with libx264, and pushes H.264 to MediaMTX via RTSP or WHIP. Each engineer's streams are namespaced (e.g. `alice/front_camera`, `bob/cam_down`) so they coexist on the shared media server without collision.
 
-When `mediamtx_base` is set, the plugin constructs the full output URL from `<mediamtx_base>/<stream_prefix>/<camera_name>`. The URL in the start command is ignored. When `mediamtx_base` is not set, the start command must include the full output URL (the original behavior for local development).
+### Components
 
-## Stream control
+| Component | Helm Chart | Count | Purpose |
+|-----------|-----------|-------|---------|
+| **coturn** | `charts/coturn` | 1 | TURN relay for WebRTC UDP traversal through the cluster boundary |
+| **MediaMTX** | `charts/mediamtx` | 1 | Media server - ingests H.264 from Gazebo pods, serves WebRTC/HLS to browsers |
+| **Viewer** | `charts/viewer` | 1 | nginx serving the web UI with runtime-injected endpoints |
+| **Gazebo Sim** | `charts/gz-sim` | N (per engineer) | Headless simulation with the camera streaming plugin |
 
-Start and stop streams by publishing `gz.msgs.StringMsg_V` to the control topic:
-
-```bash
-# Start streaming via WHIP (requires FFmpeg 7+ with WHIP muxer)
-gz topic -t /stream/control -m gz.msgs.StringMsg_V \
-  -p 'data: "start" data: "camera_name" data: "http://localhost:8889/cam1/whip"'
-
-# Start streaming via RTSP
-gz topic -t /stream/control -m gz.msgs.StringMsg_V \
-  -p 'data: "start" data: "camera_name" data: "rtsp://localhost:8554/cam1"'
-
-# Start with custom bitrate (2 Mbps) and fps (15)
-gz topic -t /stream/control -m gz.msgs.StringMsg_V \
-  -p 'data: "start" data: "cam1" data: "rtsp://localhost:8554/cam1" data: "2000000" data: "15"'
-
-# Stop
-gz topic -t /stream/control -m gz.msgs.StringMsg_V \
-  -p 'data: "stop" data: "camera_name"'
-```
-
-The control topic also works as a gz-transport service, which means it can be called from the WebSocket server interface (used by `viewer.html`).
-
-### Message format
-
-**Start:** `data=["start", "<camera_name>", "<url>", "<bitrate>", "<fps>"]`
-
-- `camera_name` - sensor name to match. Can be a short name (`cam1`), a topic-style name (`X3/front_camera`), or a fully scoped rendering name (`sensor_pod::pod_link::front_camera`). The plugin tries exact match first, then suffix match against all sensors in the scene.
-- `url` - WHIP (`http://...`) or RTSP (`rtsp://...`) endpoint. Optional when `mediamtx_base` is set.
-- `bitrate` / `fps` - optional overrides for this stream.
-
-**Stop:** `data=["stop", "<camera_name>"]`
-
-## Camera name matching
-
-When a stream start request arrives, the plugin needs to find the corresponding camera in the rendering scene. Rendering sensor names are fully scoped (e.g., `sensor_pod::pod_link::front_camera`) while the request might use a short name (`front_camera`) or a topic-style name (`X3/front_camera`). The plugin resolves this in order:
-
-1. Exact match against `Scene::SensorByName()`
-2. Extract the short name (last segment after `/`) and try exact match
-3. Suffix match - scan all sensors looking for one whose name ends with `::<short_name>`
-
-This means you can refer to cameras by whatever name is most convenient. The matching is logged at the `msg` level so you can see which rendering sensor was resolved.
+Shared services (coturn, MediaMTX, viewer) are deployed once per namespace. Gazebo instances are spun up per-engineer as independent Helm releases.
 
 ## Viewer
 
-`viewer.html` is a single-file web UI that connects to both the Gazebo WebSocket server (port 9002, for topic discovery and telemetry) and a MediaMTX instance (for WebRTC video playback). It provides:
+The viewer is a single-file web UI that connects to both MediaMTX (for WebRTC video) and each Gazebo instance's WebSocket server (for gz-transport telemetry). It provides:
 
-- Camera stream player with WebRTC (WHEP) playback
-- Topic tree with type-based filtering and icons
-- Live telemetry cards for subscribed topics (Pose, Odometry with attitude indicator and altitude sparkline, Clock, WorldStatistics, CameraInfo, Twist, and generic key-value fallback)
-- Stream control through the sidebar (click a camera to start/stop streaming)
-- Demand-based encoding: streams start when a viewer requests them and stop when all viewers disconnect
+- **WebRTC video playback** via WHEP with automatic ICE/TURN negotiation
+- **Topic tree** with type-based filtering and icons for all published gz-transport topics
+- **Live telemetry cards** - specialized renderers for Pose, Odometry (attitude indicator + altitude sparkline), Clock, WorldStatistics, CameraInfo, Twist, and a generic key-value fallback
+- **Stream control** - click a camera in the sidebar to start/stop encoding on demand
+- **Simulation selector** - connect to any engineer's sim for topic browsing and telemetry
 
-The viewer works locally (hardcoded localhost defaults) and in container deployments (endpoint URLs injected at startup via sed substitution of `__MEDIAMTX_BASE__`, `__MEDIAMTX_API__`, and `__WS_URL__` placeholders).
+Encoding is demand-driven: streams activate when a viewer requests them and stop when all viewers disconnect, so idle cameras use zero encoding resources.
 
-## Local development
+## GPU support
 
-### Requirements
+A single container image supports CPU-only, NVIDIA, and AMD GPUs. GPU selection happens at the pod level through Helm values:
 
-- [Gazebo Sim](https://gazebosim.org/) (Ionic or newer)
-- [MediaMTX](https://github.com/bluenviron/mediamtx) v1.18+
-- FFmpeg with libx264 (WHIP muxer optional, requires FFmpeg 7+)
-- cmake, pkg-config, C++17 compiler
+| Mode | `gpu.vendor` | What happens |
+|------|-------------|-------------|
+| CPU-only | `none` | Mesa llvmpipe software rendering. No GPU hardware required. |
+| NVIDIA | `nvidia` | Sets `runtimeClassName: nvidia`, requests `nvidia.com/gpu: 1`. Requires NVIDIA GPU Operator on the cluster. |
+| AMD | `amd` | Requests `amd.com/gpu: 1`, adds video group. Requires AMD GPU device plugin on the cluster. |
 
-### Build
+## Quick start
+
+### Prerequisites
+
+- Kubernetes or OpenShift cluster with Helm v3
+- `oc` or `kubectl` CLI authenticated
+- Container images built and pushed (see [Building images](#building-images))
+- For GPU: NVIDIA GPU Operator or AMD device plugin installed
+
+### Deploy shared services
 
 ```bash
-cmake -B build -DCMAKE_PREFIX_PATH=/opt/homebrew  # macOS
-cmake -B build                                     # Linux
-cmake --build build
+# Create namespace
+oc new-project gz-sim
+
+# TURN relay
+helm install coturn ./charts/coturn
+
+# Media server (set coturn.host to the node IP where coturn is running)
+helm install mediamtx ./charts/mediamtx \
+  --set coturn.host=<node-ip>
+
+# Web viewer (set the MediaMTX route URLs for your cluster)
+helm install viewer ./charts/viewer \
+  --set mediamtx.base=https://mediamtx-gz-sim.apps.<cluster> \
+  --set mediamtx.api=https://mediamtx-api-gz-sim.apps.<cluster>
 ```
 
-### Run
+### Spin up a simulation
 
 ```bash
-# Start MediaMTX
-mediamtx mediamtx-gazebo.yml
+# CPU-only
+helm install alice-sim ./charts/gz-sim --set engineer=alice
 
-# Launch headless simulation
-GZ_SIM_SYSTEM_PLUGIN_PATH=$(pwd)/build \
-  gz sim -s -r --headless-rendering quadcopter_demo.sdf -v 4
+# With NVIDIA GPU
+helm install bob-sim ./charts/gz-sim \
+  --set engineer=bob \
+  --set gpu.vendor=nvidia
 
-# Serve the viewer
-python3 -m http.server 8080
-open http://localhost:8080/viewer.html
+# Custom world file
+oc create configmap carol-world --from-file=my_world.sdf
+helm install carol-sim ./charts/gz-sim \
+  --set engineer=carol \
+  --set customWorldConfigMap=carol-world \
+  --set world=my_world
 ```
 
-The included `mediamtx-gazebo.yml` configures demand-based streaming: when a browser requests a camera path, MediaMTX tells Gazebo to start encoding. When all viewers leave, encoding stops.
+### Access
+
+```bash
+# Open the viewer
+open https://viewer-gz-sim.apps.<cluster>
+
+# Shell into a simulation pod
+oc rsh deploy/alice-sim-gazebo
+
+# Fly the quadcopter demo
+gz topic -t "/X3/gazebo/command/twist" -m gz.msgs.Twist \
+  -p "linear: {z: 0.5}"
+```
+
+### Teardown
+
+```bash
+helm uninstall alice-sim                     # Remove one sim (PVC is retained)
+helm uninstall viewer mediamtx coturn        # Remove shared services
+oc delete pvc alice-fuel-cache               # Remove retained PVC if desired
+```
+
+## Helm charts
+
+### coturn
+
+TURN server for WebRTC NAT traversal. Deployed with `hostNetwork: true` so it binds directly to the node's network stack, avoiding NodePort range-mapping issues for UDP relay ports. An init container discovers the node's external IP via the Kubernetes downward API and injects it into `turnserver.conf`.
+
+Key values:
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `credentials.username` | `gzsim` | TURN authentication username |
+| `credentials.password` | `gzsimpass` | TURN authentication password |
+| `ports.listening` | `3478` | TURN signaling port |
+| `ports.minRelay` / `maxRelay` | `49152` / `49252` | UDP relay port range |
+
+### mediamtx
+
+[MediaMTX](https://github.com/bluenviron/mediamtx) media server. Gazebo pods push H.264 streams here via RTSP or WHIP. Browsers connect via WHEP for WebRTC playback or fall back to HLS. Streams are namespaced by engineer name (e.g. `alice/front_camera`).
+
+When coturn is configured, MediaMTX includes the TURN server in ICE candidates so WebRTC works through NAT/firewalls.
+
+Key values:
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `coturn.host` | `""` | Node IP where coturn is running (enables TURN relay) |
+| `coturn.port` | `3478` | TURN server port |
+
+Exposes two services: `mediamtx-webrtc` (port 8889) for WHEP/WHIP signaling and `mediamtx-api` (port 9997) for the stream listing API.
+
+### viewer
+
+nginx serving the viewer web UI. Endpoint URLs are injected at container startup via environment variables so the same image works across clusters.
+
+Key values:
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `mediamtx.base` | `""` | Public MediaMTX URL for WHEP playback |
+| `mediamtx.api` | `""` | Public MediaMTX API URL for stream discovery |
+
+### gz-sim
+
+Per-engineer Gazebo simulation. The `engineer` value is required and controls stream namespacing, route naming, and resource labeling.
+
+Key values:
+
+| Value | Default | Description |
+|-------|---------|-------------|
+| `engineer` | `""` | **Required.** Engineer name for isolation. |
+| `world` | `quadcopter_demo` | SDF world file name from `/worlds/` |
+| `gpu.vendor` | `none` | GPU mode: `none`, `nvidia`, or `amd` |
+| `gazebo.bitrate` | `4000000` | H.264 encoding bitrate (bps) |
+| `gazebo.fps` | `30` | Encoding framerate |
+| `persistence.enabled` | `true` | Create a PVC for the Gazebo Fuel model cache |
+| `persistence.keep` | `true` | Retain PVC on `helm uninstall` |
+| `persistence.size` | `5Gi` | Fuel cache PVC size |
+| `customWorldConfigMap` | `""` | ConfigMap containing a custom SDF world file |
+
+## Building images
+
+### gz-sim-streamer
+
+Multi-stage build on UBI 10. Compiles the CameraStream plugin in the build stage, copies the shared library and world files into a minimal runtime image with Mesa drivers for all GPU modes.
+
+```bash
+podman build -t quay.io/<org>/gz-sim-streamer:latest -f Containerfile.gazebo .
+podman push quay.io/<org>/gz-sim-streamer:latest
+```
+
+### gz-viewer
+
+nginx on UBI 10 minimal. Copies `viewer.html` as a template and runs `envsubst` at startup to inject MediaMTX endpoint URLs.
+
+```bash
+podman build -t quay.io/<org>/gz-viewer:latest -f Containerfile.viewer .
+podman push quay.io/<org>/gz-viewer:latest
+```
 
 ## Demo worlds
 
 ### quadcopter_demo.sdf
 
-X3 UAV quadcopter from [Gazebo Fuel](https://fuel.gazebosim.org/) with velocity control, three cameras (front-facing 1280x720, downward 640x480, tower overview 1280x720), ground objects (gas station, vehicles, warehouse, water tower), and a landing pad. Use `fly_patrol.sh` for an autonomous rectangular patrol pattern.
+X3 UAV quadcopter with velocity control, three cameras (front 1280x720, downward 640x480, tower overview 1280x720), ground objects, and a landing pad. Run `fly_patrol.sh` inside the pod for an autonomous rectangular patrol pattern.
 
 ### headless_camera.sdf
 
-Minimal test scene with a spinning arm, falling shapes, and a single static camera. Useful for verifying the encoding pipeline works without the overhead of a full world.
+Minimal test scene with a spinning arm, falling shapes, and a single static camera. Good for verifying the encoding pipeline without the overhead of a full world.
 
-## Container deployment
+## Networking
 
-This repo includes Containerfiles and Helm charts for deploying the full pipeline on Kubernetes/OpenShift. See the `charts/` directory for the four Helm charts (coturn, mediamtx, viewer, gz-sim) and `docs/architecture-diagram.html` for the deployment topology.
+### Routes (OpenShift)
+
+| Route | Target | Purpose |
+|-------|--------|---------|
+| `mediamtx.apps.<cluster>` | mediamtx-webrtc:8889 | WHEP video signaling, HLS fallback |
+| `mediamtx-api.apps.<cluster>` | mediamtx-api:9997 | Stream listing API |
+| `viewer.apps.<cluster>` | gz-viewer:8080 | Web UI |
+| `gz-<engineer>.apps.<cluster>` | `<engineer>-gazebo:9002` | Gazebo WebSocket (telemetry) |
+
+WebSocket routes use the `haproxy.router.openshift.io/timeout: 300s` annotation for long-lived connections.
+
+coturn uses `hostNetwork` and binds directly to node ports - no Route or Ingress needed.
+
+### Stream path convention
+
+All stream paths follow the pattern `<engineer>/<camera_name>`. The `STREAM_PREFIX` environment variable (set by the Helm chart to the engineer name) is prepended automatically by the CameraStream plugin. This means multiple engineers can use identical world files with identical camera names and their streams won't collide.
+
+## Roadmap
+
+This is the initial deployment infrastructure. Planned work includes:
+
+- Multi-robot coordination across simulation instances
+- Shared world state for collaborative scenarios
+- ROS 2 bridge integration for control pipeline testing
+- Automated CI/CD for world file validation
+- Cluster autoscaling policies for simulation workloads
+- Recording and replay of simulation sessions
 
 ## License
 
