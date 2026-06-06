@@ -22,10 +22,10 @@ spec:
       {{- if eq .Values.gpu.vendor "nvidia" }}
       runtimeClassName: nvidia
       nodeSelector:
-        nvidia.com/gpu.present: "true"
+        {{- toYaml .Values.gpu.nvidia.nodeSelector | nindent 8 }}
       {{- else if eq .Values.gpu.vendor "amd" }}
       nodeSelector:
-        amd.com/gpu.present: "true"
+        {{- toYaml .Values.gpu.amd.nodeSelector | nindent 8 }}
       securityContext:
         supplementalGroups: [44]
       {{- end }}

@@ -10,6 +10,12 @@ image:
 
 gpu:
   vendor: none    # none | nvidia | amd
+  amd:
+    nodeSelector:
+      feature.node.kubernetes.io/pci-0380_1002_1586.present: "true"
+  nvidia:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
 
 resources:
   requests:
