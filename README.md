@@ -1,6 +1,6 @@
 # rhork
 
-A distributed robotics simulation platform that gives each engineer an isolated [Gazebo Sim](https://gazebosim.org/) instance with live camera streaming to a browser via WebRTC. Simulations run headless on Kubernetes/OpenShift with optional GPU acceleration, while a shared media infrastructure handles video relay, NAT traversal, and a web-based viewer with real-time telemetry.
+A distributed robotics simulation platform that gives each engineer an isolated [Gazebo Sim](https://gazebosim.org/) instance with live camera streaming to a browser via WebRTC. Built on **Gazebo Sim 11 (Kilimanjaro)**, simulations run headless on Kubernetes/OpenShift with optional GPU acceleration, while a shared media infrastructure handles video relay, NAT traversal, and a web-based viewer with real-time telemetry.
 
 ## Why
 
