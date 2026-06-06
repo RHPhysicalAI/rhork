@@ -1,0 +1,147 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 480" font-family="'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="clusterBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1a1f2e"/>
+      <stop offset="100%" stop-color="#12161f"/>
+    </linearGradient>
+    <linearGradient id="mediamtxBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="100%" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="coturnBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0e7490"/>
+      <stop offset="100%" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="viewerBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#b91c1c"/>
+      <stop offset="100%" stop-color="#991b1b"/>
+    </linearGradient>
+    <linearGradient id="gazeboBg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d97706"/>
+      <stop offset="100%" stop-color="#b45309"/>
+    </linearGradient>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="116%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.25"/>
+    </filter>
+    <marker id="arrowWhite" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="none" stroke="#94a3b8" stroke-width="1"/>
+    </marker>
+    <marker id="arrowOrange" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="none" stroke="#fbbf24" stroke-width="1"/>
+    </marker>
+    <marker id="arrowCyan" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <path d="M0,0 L7,2.5 L0,5" fill="none" stroke="#22d3ee" stroke-width="1"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="480" rx="10" fill="#0f1117"/>
+
+  <!-- Title -->
+  <text x="450" y="30" text-anchor="middle" fill="#e2e8f0" font-size="16" font-weight="700" letter-spacing="0.5">rhork Architecture</text>
+
+  <!-- Browser -->
+  <rect x="20" y="155" width="90" height="55" rx="7" fill="#2d3748" stroke="#475569" stroke-width="1" filter="url(#shadow)"/>
+  <rect x="20" y="155" width="90" height="14" rx="7" fill="#374151"/>
+  <rect x="20" y="164" width="90" height="5" fill="#374151"/>
+  <circle cx="29" cy="164" r="2.5" fill="#ef4444"/>
+  <circle cx="37" cy="164" r="2.5" fill="#fbbf24"/>
+  <circle cx="45" cy="164" r="2.5" fill="#22c55e"/>
+  <text x="65" y="188" text-anchor="middle" fill="#e2e8f0" font-size="11" font-weight="700">Browser</text>
+  <text x="65" y="200" text-anchor="middle" fill="#64748b" font-size="7">WebRTC + telemetry</text>
+
+  <!-- Cluster -->
+  <rect x="160" y="46" width="720" height="420" rx="10" fill="url(#clusterBg)" stroke="#334155" stroke-width="1.5"/>
+  <rect x="160" y="46" width="720" height="24" rx="10" fill="#1e293b"/>
+  <rect x="160" y="62" width="720" height="8" fill="#1e293b"/>
+  <circle cx="177" cy="60" r="7" fill="none" stroke="#ee0000" stroke-width="1.6"/>
+  <text x="191" y="63" fill="#e2e8f0" font-size="10" font-weight="700">OpenShift Cluster</text>
+  <text x="868" y="63" text-anchor="end" fill="#475569" font-size="8">gz-sim</text>
+
+  <!-- Routes bar -->
+  <rect x="174" y="78" width="10" height="376" rx="2" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+  <text x="179" y="270" text-anchor="middle" fill="#2d3b50" font-size="6" transform="rotate(-90, 179, 270)" letter-spacing="1">ROUTES</text>
+
+  <!-- ====== MediaMTX ====== -->
+  <rect x="205" y="85" width="200" height="75" rx="7" fill="url(#mediamtxBg)" stroke="#6366f1" stroke-width="1" filter="url(#shadow)"/>
+  <text x="305" y="110" text-anchor="middle" fill="#e0e7ff" font-size="13" font-weight="700">MediaMTX</text>
+  <text x="305" y="124" text-anchor="middle" fill="#a5b4fc" font-size="9">Media Server</text>
+  <text x="305" y="150" text-anchor="middle" fill="#7c7fbf" font-size="7">ClusterIP :8889 WHEP/WHIP  :9997 API  |  Pod :8554 RTSP</text>
+
+  <!-- ====== coturn ====== -->
+  <rect x="205" y="178" width="200" height="62" rx="7" fill="url(#coturnBg)" stroke="#06b6d4" stroke-width="1" filter="url(#shadow)"/>
+  <text x="305" y="202" text-anchor="middle" fill="#e0f2fe" font-size="13" font-weight="700">coturn</text>
+  <text x="305" y="216" text-anchor="middle" fill="#7dd3fc" font-size="9">TURN Relay</text>
+  <text x="305" y="234" text-anchor="middle" fill="#4d8fa8" font-size="7">hostNetwork :3478  :49152-49252 UDP</text>
+
+  <!-- ====== Viewer ====== -->
+  <rect x="205" y="258" width="200" height="50" rx="7" fill="url(#viewerBg)" stroke="#ef4444" stroke-width="1" filter="url(#shadow)"/>
+  <text x="305" y="282" text-anchor="middle" fill="#fef2f2" font-size="13" font-weight="700">Viewer</text>
+  <text x="305" y="300" text-anchor="middle" fill="#e8a0a0" font-size="7">nginx :8080  |  envsubst endpoint injection</text>
+
+  <!-- ====== Gazebo pods ====== -->
+  <rect x="440" y="85" width="425" height="270" rx="7" fill="none" stroke="#92400e" stroke-width="0.8" stroke-dasharray="5,3"/>
+  <text x="652" y="100" text-anchor="middle" fill="#92400e" font-size="8" font-weight="600" letter-spacing="0.5">SIMULATION INSTANCES</text>
+
+  <!-- pick-place -->
+  <rect x="455" y="108" width="396" height="66" rx="6" fill="url(#gazeboBg)" stroke="#f59e0b" stroke-width="1" filter="url(#shadow)"/>
+  <text x="652" y="130" text-anchor="middle" fill="#fefce8" font-size="13" font-weight="700">pick-place</text>
+  <text x="652" y="145" text-anchor="middle" fill="#fde68a" font-size="9">CameraStream H.264  |  WebSocket :9002  |  GPU: none (mesa)</text>
+  <text x="652" y="167" text-anchor="middle" fill="#c9a86c" font-size="7">Service + Route (WSS)  |  PVC 5Gi retained  |  pick-place/{overhead_cam, aisle_cam, entrance_cam}</text>
+
+  <!-- nav-test -->
+  <rect x="455" y="186" width="396" height="66" rx="6" fill="url(#gazeboBg)" stroke="#f59e0b" stroke-width="1" filter="url(#shadow)"/>
+  <text x="652" y="208" text-anchor="middle" fill="#fefce8" font-size="13" font-weight="700">nav-test</text>
+  <text x="652" y="223" text-anchor="middle" fill="#fde68a" font-size="9">CameraStream H.264  |  WebSocket :9002  |  GPU: nvidia</text>
+  <text x="652" y="245" text-anchor="middle" fill="#c9a86c" font-size="7">Service + Route (WSS)  |  PVC 5Gi retained  |  nav-test/{overhead_cam, aisle_cam, entrance_cam}</text>
+
+  <!-- ghost n -->
+  <rect x="455" y="264" width="396" height="30" rx="6" fill="#1e1a0f" stroke="#92400e" stroke-width="0.5" opacity="0.35" stroke-dasharray="4,2"/>
+  <text x="652" y="284" text-anchor="middle" fill="#fde68a" font-size="9" opacity="0.4">helm install &lt;name&gt;-sim --set sim=&lt;name&gt;</text>
+
+  <!-- ====== Pipeline ====== -->
+  <rect x="205" y="375" width="660" height="30" rx="6" fill="#1a1625" stroke="#4338ca" stroke-width="0.6"/>
+  <text x="535" y="394" text-anchor="middle" fill="#7c6dab" font-size="8.5">PostRender  ->  RGB  ->  YUV420P  ->  H.264 (libx264)  ->  RTSP  ->  MediaMTX  ->  WHEP  ->  Browser</text>
+
+  <!-- ====== Connections ====== -->
+
+  <!-- Browser -> MediaMTX (WHEP) -->
+  <path d="M110,170 L205,125" fill="none" stroke="#818cf8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowWhite)"/>
+  <rect x="126" y="135" width="38" height="12" rx="3" fill="#312e81"/>
+  <text x="145" y="144" text-anchor="middle" fill="#a5b4fc" font-size="7" font-weight="600">WHEP</text>
+
+  <!-- Browser -> coturn (UDP) -->
+  <path d="M110,190 L205,210" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowCyan)"/>
+  <rect x="120" y="198" width="48" height="12" rx="3" fill="#164e63"/>
+  <text x="144" y="207" text-anchor="middle" fill="#67e8f9" font-size="7" font-weight="600">UDP media</text>
+
+  <!-- Browser -> Viewer (HTTPS) -->
+  <path d="M110,205 L205,278" fill="none" stroke="#f87171" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#arrowWhite)"/>
+
+  <!-- Browser -> Gazebo (WSS) -->
+  <path d="M110,210 Q200,340 455,220" fill="none" stroke="#fb923c" stroke-width="1" stroke-dasharray="5,3" marker-end="url(#arrowOrange)"/>
+  <rect x="120" y="280" width="32" height="12" rx="3" fill="#78350f"/>
+  <text x="136" y="289" text-anchor="middle" fill="#fde68a" font-size="7" font-weight="600">WSS</text>
+
+  <!-- Gazebo -> MediaMTX (RTSP) -->
+  <path d="M455,140 L405,130" fill="none" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#arrowOrange)"/>
+  <path d="M455,218 L405,145" fill="none" stroke="#fbbf24" stroke-width="1.3" opacity="0.5" marker-end="url(#arrowOrange)"/>
+  <rect x="412" y="126" width="30" height="11" rx="3" fill="#78350f"/>
+  <text x="427" y="134" text-anchor="middle" fill="#fde68a" font-size="6.5" font-weight="600">RTSP</text>
+
+  <!-- MediaMTX -> coturn (ICE) -->
+  <path d="M305,160 L305,178" fill="none" stroke="#64748b" stroke-width="0.8" stroke-dasharray="3,2" marker-end="url(#arrowWhite)"/>
+
+  <!-- ====== Legend ====== -->
+  <rect x="205" y="418" width="660" height="26" rx="5" fill="#1e293b" stroke="#334155" stroke-width="0.5"/>
+  <line x1="220" y1="432" x2="240" y2="432" stroke="#818cf8" stroke-width="1.3" stroke-dasharray="5,3"/>
+  <text x="245" y="435" fill="#64748b" font-size="7">external</text>
+  <line x1="295" y1="432" x2="315" y2="432" stroke="#fbbf24" stroke-width="1.8"/>
+  <text x="320" y="435" fill="#64748b" font-size="7">video (RTSP)</text>
+  <line x1="385" y1="432" x2="405" y2="432" stroke="#22d3ee" stroke-width="1.3" stroke-dasharray="5,3"/>
+  <text x="410" y="435" fill="#64748b" font-size="7">UDP relay</text>
+  <line x1="465" y1="432" x2="485" y2="432" stroke="#fb923c" stroke-width="1.3" stroke-dasharray="5,3"/>
+  <text x="490" y="435" fill="#64748b" font-size="7">telemetry</text>
+  <line x1="540" y1="432" x2="560" y2="432" stroke="#64748b" stroke-width="0.8" stroke-dasharray="3,2"/>
+  <text x="565" y="435" fill="#64748b" font-size="7">config</text>
+</svg>

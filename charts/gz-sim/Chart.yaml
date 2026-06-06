@@ -1,5 +1,5 @@
 apiVersion: v2
 name: gz-sim
-description: Per-engineer Gazebo simulation instance with camera streaming
+description: Gazebo simulation instance with camera streaming
 version: 0.1.0
 appVersion: "0.1.0"

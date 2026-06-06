@@ -2,7 +2,7 @@
 #
 # Key differences from local mediamtx-gazebo.yml:
 # - No IPv4 loopback restriction (pods communicate over cluster network)
-# - Wider path pattern for namespaced streams (engineer/camera)
+# - Wider path pattern for namespaced streams (sim/camera)
 # - No runOnDemand (Gazebo pods push directly via WHIP)
 # - ICE servers configured to point at coturn TURN relay
 
@@ -36,5 +36,5 @@ hlsAddress: :8888
 pathDefaults:
 
 paths:
-  # Match any path - namespaced (engineer/camera) or simple (camera)
+  # Match any path - namespaced (sim/camera) or simple (camera)
   ~^(.+)$:

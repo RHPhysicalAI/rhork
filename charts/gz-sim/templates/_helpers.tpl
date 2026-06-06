@@ -6,8 +6,8 @@
 app.kubernetes.io/name: gz-sim
 app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- if .Values.engineer }}
-gz-sim/engineer: {{ .Values.engineer }}
+{{- if .Values.sim }}
+gz-sim/sim: {{ .Values.sim }}
 {{- end }}
 {{- end }}
 

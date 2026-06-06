@@ -2,7 +2,7 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: gz-{{ .Values.engineer }}
+  name: gz-{{ .Values.sim }}
   labels:
     {{- include "gzsim.labels" . | nindent 4 }}
   annotations:

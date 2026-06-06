@@ -1,5 +1,5 @@
-{{- if not .Values.engineer }}
-{{- fail "engineer is required: --set engineer=<name>" }}
+{{- if not .Values.sim }}
+{{- fail "sim is required: --set sim=<name>" }}
 {{- end }}
 apiVersion: apps/v1
 kind: Deployment
@@ -46,7 +46,7 @@ spec:
         - name: GZ_FUEL_CACHE_PATH
           value: /fuel-cache
         - name: STREAM_PREFIX
-          value: {{ .Values.engineer | quote }}
+          value: {{ .Values.sim | quote }}
         - name: MEDIAMTX_WHIP_BASE
           value: "rtsp://{{ .Values.mediamtx.host }}:{{ .Values.mediamtx.rtspPort }}"
         {{- if eq .Values.gpu.vendor "none" }}
@@ -94,7 +94,7 @@ spec:
       {{- if .Values.persistence.enabled }}
       - name: fuel-cache
         persistentVolumeClaim:
-          claimName: {{ .Values.engineer }}-fuel-cache
+          claimName: {{ .Values.sim }}-fuel-cache
       {{- end }}
       {{- if .Values.customWorldConfigMap }}
       - name: custom-world

@@ -1,12 +1,12 @@
 # rhork
 
-A distributed robotics simulation platform that gives each engineer an isolated [Gazebo Sim](https://gazebosim.org/) instance with live camera streaming to a browser via WebRTC. Built on **Gazebo Sim 11 (Kilimanjaro)**, simulations run headless on Kubernetes/OpenShift with optional GPU acceleration, while a shared media infrastructure handles video relay, NAT traversal, and a web-based viewer with real-time telemetry.
+A distributed robotics simulation platform that runs isolated [Gazebo Sim](https://gazebosim.org/) instances with live camera streaming to a browser via WebRTC. Built on **Gazebo Sim 11 (Kilimanjaro)**, simulations run headless on Kubernetes/OpenShift with optional GPU acceleration, while a shared media infrastructure handles video relay, NAT traversal, and a web-based viewer with real-time telemetry.
 
 ## Why
 
-Robotics simulation is compute-heavy, latency-sensitive, and typically locked to a single developer's workstation. rhork moves simulation to the cluster so that:
+Robotics simulation is compute-heavy, latency-sensitive, and typically locked to a single workstation. rhork moves simulation to the cluster so that:
 
-- Engineers get isolated sim environments without GPU workstations
+- Each simulation gets its own isolated environment with dedicated resources
 - Camera feeds stream to any browser with sub-second latency via WebRTC
 - Shared infrastructure (media server, TURN relay, viewer) is deployed once
 - Sims scale independently - spin up a new one with a single Helm install
@@ -14,38 +14,11 @@ Robotics simulation is compute-heavy, latency-sensitive, and typically locked to
 
 ## Architecture
 
-```
-                             ┌───────────────────────────────────────┐
-                             │           Kubernetes Cluster           │
-                             │           Namespace: gz-sim            │
-                             │                                        │
-  Browser                    │  ┌──────────┐    RTSP / WHIP           │
-  ── WHEP (HTTPS) ──────────────>│ MediaMTX │<──────────── Gazebo (alice)
-  ── API  (HTTPS) ──────────────>│   :8889  │<──────────── Gazebo (bob)
-                             │  │   :9997  │<──────────── Gazebo (carol)
-                             │  └──────────┘                          │
-                             │       │ ICE candidates                 │
-                             │       v (point to coturn)              │
-                             │  ┌──────────┐                          │
-  ── UDP media (TURN) ──────────>│  coturn  │  hostNetwork             │
-  ── TURN/TCP fallback ─────────>│  :3478   │                          │
-                             │  │  :49152- │                          │
-                             │  │   49252  │                          │
-                             │  └──────────┘                          │
-                             │                                        │
-  ── viewer.html (HTTPS) ──────> nginx :8080                          │
-  ── WebSocket  (WSS) ─────────> Gazebo :9002 (per-engineer)          │
-                             │                                        │
-                             └───────────────────────────────────────┘
-```
+<p align="center">
+  <img src="docs/architecture.svg" alt="rhork architecture diagram" width="900"/>
+</p>
 
-### Streaming pipeline
-
-```
-Gazebo PostRender -> RGB/RGBA -> YUV420P (swscale) -> H.264 (libx264) -> RTSP/WHIP -> MediaMTX -> WebRTC (WHEP) -> Browser
-```
-
-Video capture and encoding are handled by the [gz-camera-stream](https://github.com/TODO/gz-camera-stream) plugin, a world-level Gazebo system plugin that hooks into the render loop, encodes frames with libx264, and pushes H.264 to MediaMTX via RTSP or WHIP. Each engineer's streams are namespaced (e.g. `alice/front_camera`, `bob/cam_down`) so they coexist on the shared media server without collision.
+Video capture and encoding are handled by the [gz-camera-stream](https://github.com/TODO/gz-camera-stream) plugin, a world-level Gazebo system plugin that hooks into the render loop, encodes frames with libx264, and pushes H.264 to MediaMTX via RTSP or WHIP. Each simulation's streams are namespaced (e.g. `pick-place/overhead_cam`, `nav-test/aisle_cam`) so they coexist on the shared media server without collision.
 
 ### Components
 
@@ -54,9 +27,9 @@ Video capture and encoding are handled by the [gz-camera-stream](https://github.
 | **coturn** | `charts/coturn` | 1 | TURN relay for WebRTC UDP traversal through the cluster boundary |
 | **MediaMTX** | `charts/mediamtx` | 1 | Media server - ingests H.264 from Gazebo pods, serves WebRTC/HLS to browsers |
 | **Viewer** | `charts/viewer` | 1 | nginx serving the web UI with runtime-injected endpoints |
-| **Gazebo Sim** | `charts/gz-sim` | N (per engineer) | Headless simulation with the camera streaming plugin |
+| **Gazebo Sim** | `charts/gz-sim` | N | Headless simulation with the camera streaming plugin |
 
-Shared services (coturn, MediaMTX, viewer) are deployed once per namespace. Gazebo instances are spun up per-engineer as independent Helm releases.
+Shared services (coturn, MediaMTX, viewer) are deployed once per namespace. Simulation instances are spun up as independent Helm releases.
 
 ## Viewer
 
@@ -66,7 +39,7 @@ The viewer is a single-file web UI that connects to both MediaMTX (for WebRTC vi
 - **Topic tree** with type-based filtering and icons for all published gz-transport topics
 - **Live telemetry cards** - specialized renderers for Pose, Odometry (attitude indicator + altitude sparkline), Clock, WorldStatistics, CameraInfo, Twist, and a generic key-value fallback
 - **Stream control** - click a camera in the sidebar to start/stop encoding on demand
-- **Simulation selector** - connect to any engineer's sim for topic browsing and telemetry
+- **Simulation selector** - connect to any running sim for topic browsing and telemetry
 
 Encoding is demand-driven: streams activate when a viewer requests them and stop when all viewers disconnect, so idle cameras use zero encoding resources.
 
@@ -112,19 +85,19 @@ helm install viewer ./charts/viewer \
 
 ```bash
 # Warehouse world (default)
-helm install alice-sim ./charts/gz-sim --set engineer=alice
+helm install pick-place ./charts/gz-sim --set sim=pick-place
 
-# Quadcopter demo instead
-helm install bob-sim ./charts/gz-sim \
-  --set engineer=bob \
+# Quadcopter demo with GPU
+helm install nav-test ./charts/gz-sim \
+  --set sim=nav-test \
   --set world=quadcopter_demo \
   --set gpu.vendor=nvidia
 
 # Custom world file
-oc create configmap carol-world --from-file=my_world.sdf
-helm install carol-sim ./charts/gz-sim \
-  --set engineer=carol \
-  --set customWorldConfigMap=carol-world \
+oc create configmap dock-world --from-file=my_world.sdf
+helm install dock-sequence ./charts/gz-sim \
+  --set sim=dock-sequence \
+  --set customWorldConfigMap=dock-world \
   --set world=my_world
 ```
 
@@ -135,15 +108,15 @@ helm install carol-sim ./charts/gz-sim \
 open https://viewer-gz-sim.apps.<cluster>
 
 # Shell into a simulation pod
-oc rsh deploy/alice-sim-gazebo
+oc rsh deploy/pick-place-gazebo
 ```
 
 ### Teardown
 
 ```bash
-helm uninstall alice-sim                     # Remove one sim (PVC is retained)
+helm uninstall pick-place                    # Remove one sim (PVC is retained)
 helm uninstall viewer mediamtx coturn        # Remove shared services
-oc delete pvc alice-fuel-cache               # Remove retained PVC if desired
+oc delete pvc pick-place-fuel-cache          # Remove retained PVC if desired
 ```
 
 ## Helm charts
@@ -163,7 +136,7 @@ Key values:
 
 ### mediamtx
 
-[MediaMTX](https://github.com/bluenviron/mediamtx) media server. Gazebo pods push H.264 streams here via RTSP or WHIP. Browsers connect via WHEP for WebRTC playback or fall back to HLS. Streams are namespaced by engineer name (e.g. `alice/front_camera`).
+[MediaMTX](https://github.com/bluenviron/mediamtx) media server. Gazebo pods push H.264 streams here via RTSP or WHIP. Browsers connect via WHEP for WebRTC playback or fall back to HLS. Streams are namespaced by simulation name (e.g. `pick-place/overhead_cam`).
 
 When coturn is configured, MediaMTX includes the TURN server in ICE candidates so WebRTC works through NAT/firewalls.
 
@@ -189,14 +162,14 @@ Key values:
 
 ### gz-sim
 
-Per-engineer Gazebo simulation. The `engineer` value is required and controls stream namespacing, route naming, and resource labeling.
+Gazebo simulation instance. The `sim` value is required and controls stream namespacing, route naming, and resource labeling.
 
 Key values:
 
 | Value | Default | Description |
 |-------|---------|-------------|
-| `engineer` | `""` | **Required.** Engineer name for isolation. |
-| `world` | `quadcopter_demo` | SDF world file name from `/worlds/` |
+| `sim` | `""` | **Required.** Simulation name for isolation and stream namespacing. |
+| `world` | `small_warehouse` | SDF world file name from `/worlds/` |
 | `gpu.vendor` | `none` | GPU mode: `none`, `nvidia`, or `amd` |
 | `gazebo.bitrate` | `4000000` | H.264 encoding bitrate (bps) |
 | `gazebo.fps` | `30` | Encoding framerate |
@@ -242,7 +215,7 @@ The original Classic Gazebo (SDF 1.6) world has been adapted for Gazebo Sim 11 w
 X3 UAV quadcopter with velocity control, three cameras (front 1280x720, downward 640x480, tower overview 1280x720), ground objects, and a landing pad. Run `fly_patrol.sh` inside the pod for an autonomous rectangular patrol pattern.
 
 ```bash
-helm install alice-sim ./charts/gz-sim --set engineer=alice --set world=quadcopter_demo
+helm install nav-test ./charts/gz-sim --set sim=nav-test --set world=quadcopter_demo
 ```
 
 ### headless_camera.sdf
@@ -258,7 +231,7 @@ Minimal test scene with a spinning arm, falling shapes, and a single static came
 | `mediamtx.apps.<cluster>` | mediamtx-webrtc:8889 | WHEP video signaling, HLS fallback |
 | `mediamtx-api.apps.<cluster>` | mediamtx-api:9997 | Stream listing API |
 | `viewer.apps.<cluster>` | gz-viewer:8080 | Web UI |
-| `gz-<engineer>.apps.<cluster>` | `<engineer>-gazebo:9002` | Gazebo WebSocket (telemetry) |
+| `gz-<sim>.apps.<cluster>` | `<sim>-gazebo:9002` | Gazebo WebSocket (telemetry) |
 
 WebSocket routes use the `haproxy.router.openshift.io/timeout: 300s` annotation for long-lived connections.
 
@@ -266,7 +239,7 @@ coturn uses `hostNetwork` and binds directly to node ports - no Route or Ingress
 
 ### Stream path convention
 
-All stream paths follow the pattern `<engineer>/<camera_name>`. The `STREAM_PREFIX` environment variable (set by the Helm chart to the engineer name) is prepended automatically by the CameraStream plugin. This means multiple engineers can use identical world files with identical camera names and their streams won't collide.
+All stream paths follow the pattern `<sim>/<camera_name>`. The `STREAM_PREFIX` environment variable (set by the Helm chart to the sim name) is prepended automatically by the CameraStream plugin. This means multiple simulations can use identical world files with identical camera names and their streams won't collide.
 
 ## Roadmap
 
