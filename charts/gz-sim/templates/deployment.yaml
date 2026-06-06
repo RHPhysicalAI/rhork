@@ -41,6 +41,8 @@ spec:
         env:
         - name: GZ_SIM_SYSTEM_PLUGIN_PATH
           value: /usr/local/lib
+        - name: GZ_SIM_RESOURCE_PATH
+          value: /models/aws_warehouse
         - name: GZ_FUEL_CACHE_PATH
           value: /fuel-cache
         - name: STREAM_PREFIX

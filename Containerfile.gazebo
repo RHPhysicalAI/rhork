@@ -30,13 +30,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/out/libgz-sim-camera-stream-system.so /usr/local/lib/
-COPY quadcopter_demo.sdf headless_camera.sdf /worlds/
+COPY models/ /models/
+COPY small_warehouse.sdf quadcopter_demo.sdf headless_camera.sdf /worlds/
 COPY fly_patrol.sh /usr/local/bin/fly_patrol.sh
 
 ENV GZ_SIM_SYSTEM_PLUGIN_PATH=/usr/local/lib
+ENV GZ_SIM_RESOURCE_PATH=/models/aws_warehouse
 ENV GZ_FUEL_CACHE_PATH=/fuel-cache
 
 EXPOSE 9002
 
 ENTRYPOINT ["gz", "sim", "-s", "-r", "--headless-rendering"]
-CMD ["/worlds/quadcopter_demo.sdf", "-v", "4"]
+CMD ["/worlds/small_warehouse.sdf", "-v", "4"]

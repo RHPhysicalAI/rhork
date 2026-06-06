@@ -1,0 +1,361 @@
+<?xml version="1.0" ?>
+<!--
+  Amazon small warehouse environment for rhork.
+
+  Ported from the AWS RoboMaker Small Warehouse World
+  (https://github.com/aws-robotics/aws-robomaker-small-warehouse-world)
+  Original: MIT-0 license.
+
+  Adapted for Gazebo Sim 11 (Kilimanjaro) with CameraStream plugin
+  and three fixed surveillance cameras for video streaming.
+
+  Launch headless:
+    GZ_SIM_RESOURCE_PATH=models/aws_warehouse \
+      gz sim -s -r --headless-rendering small_warehouse.sdf -v 4
+-->
+<sdf version="1.9">
+  <world name="small_warehouse">
+
+    <physics name="4ms" type="ignored">
+      <max_step_size>0.004</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <!-- Core system plugins -->
+    <plugin
+        filename="gz-sim-physics-system"
+        name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+        filename="gz-sim-user-commands-system"
+        name="gz::sim::systems::UserCommands">
+    </plugin>
+    <plugin
+        filename="gz-sim-scene-broadcaster-system"
+        name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <plugin
+        filename="gz-sim-sensors-system"
+        name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- WebSocket server for viewer.html -->
+    <plugin
+        filename="gz-sim-websocket-server-system"
+        name="gz::sim::systems::WebsocketServer">
+      <publication_hz>30</publication_hz>
+      <port>9002</port>
+      <max_connections>-1</max_connections>
+    </plugin>
+
+    <!-- CameraStream - H.264 encoding to MediaMTX -->
+    <plugin
+        filename="gz-sim-camera-stream-system"
+        name="gz::sim::systems::CameraStream">
+      <topic>/stream/control</topic>
+      <default_bitrate>4000000</default_bitrate>
+      <default_fps>30</default_fps>
+    </plugin>
+
+    <!-- Scene -->
+    <scene>
+      <ambient>0.4 0.4 0.4 1.0</ambient>
+      <background>0.1 0.1 0.1 1.0</background>
+      <grid>false</grid>
+    </scene>
+
+    <!-- Warehouse ceiling light -->
+    <light name="warehouse_ceiling_light" type="point">
+      <pose>0 0 9 0 0 0</pose>
+      <diffuse>0.5 0.5 0.5 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>80</range>
+        <constant>0.3</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <cast_shadows>true</cast_shadows>
+      <direction>0.1 0.1 -1</direction>
+    </light>
+
+    <!-- Fill light for camera visibility -->
+    <light type="directional" name="fill_light">
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.3 0.3 0.3 1</diffuse>
+      <specular>0.1 0.1 0.1 1</specular>
+      <direction>0 0 -1</direction>
+      <cast_shadows>false</cast_shadows>
+    </light>
+
+    <!-- ==================== Structure ==================== -->
+
+    <model name="aws_robomaker_warehouse_GroundB_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_GroundB_01</uri>
+      </include>
+      <pose>0.0 0.0 -0.090092 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_WallB_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_WallB_01</uri>
+      </include>
+      <pose>0.0 0.0 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_RoofB_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_RoofB_01</uri>
+      </include>
+      <pose>0.0 0.0 0 0 0 0</pose>
+    </model>
+
+    <!-- ==================== Shelves ==================== -->
+
+    <model name="aws_robomaker_warehouse_ShelfF_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfF_01</uri>
+      </include>
+      <pose>-5.795143 -0.956635 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfE_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
+      </include>
+      <pose>4.73156 0.57943 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfE_01_002">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
+      </include>
+      <pose>4.73156 -4.827049 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfE_01_003">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfE_01</uri>
+      </include>
+      <pose>4.73156 -8.6651 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfD_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
+      </include>
+      <pose>4.73156 -1.242668 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfD_01_002">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
+      </include>
+      <pose>4.73156 -3.038551 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ShelfD_01_003">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ShelfD_01</uri>
+      </include>
+      <pose>4.73156 -6.750542 0 0 0 0</pose>
+    </model>
+
+    <!-- ==================== Props ==================== -->
+
+    <model name="aws_robomaker_warehouse_Lamp_01_005">
+      <include>
+        <uri>model://aws_robomaker_warehouse_Lamp_01</uri>
+      </include>
+      <pose>0 0 -4 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_Bucket_01_020">
+      <include>
+        <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
+      </include>
+      <pose>0.433449 9.631706 0 0 0 -1.563161</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_Bucket_01_021">
+      <include>
+        <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
+      </include>
+      <pose>-1.8321 -6.3752 0 0 0 -1.563161</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_Bucket_01_022">
+      <include>
+        <uri>model://aws_robomaker_warehouse_Bucket_01</uri>
+      </include>
+      <pose>0.433449 8.59 0 0 0 -1.563161</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringA_01_016">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
+      </include>
+      <pose>5.708138 8.616844 -0.017477 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringA_01_017">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
+      </include>
+      <pose>3.408638 8.616844 -0.017477 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringA_01_018">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringA_01</uri>
+      </include>
+      <pose>-1.491287 5.222435 -0.017477 0 0 -1.583185</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_027">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>3.324959 3.822449 -0.012064 0 0 1.563871</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_028">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>5.54171 3.816475 -0.015663 0 0 -1.583191</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_029">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>5.384239 6.137154 0 0 0 3.150000</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_030">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>3.236 6.137154 0 0 0 3.150000</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_031">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>-1.573677 2.301994 -0.015663 0 0 -3.133191</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringC_01_032">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringC_01</uri>
+      </include>
+      <pose>-1.2196 9.407 -0.015663 0 0 1.563871</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_ClutteringD_01_005">
+      <include>
+        <uri>model://aws_robomaker_warehouse_ClutteringD_01</uri>
+      </include>
+      <pose>-1.634682 -7.811813 -0.319559 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_TrashCanC_01_002">
+      <include>
+        <uri>model://aws_robomaker_warehouse_TrashCanC_01</uri>
+      </include>
+      <pose>-1.592441 7.715420 0 0 0 0</pose>
+    </model>
+
+    <model name="aws_robomaker_warehouse_PalletJackB_01_001">
+      <include>
+        <uri>model://aws_robomaker_warehouse_PalletJackB_01</uri>
+      </include>
+      <pose>-0.276098 -9.481944 0.023266 0 0 0</pose>
+    </model>
+
+    <!-- ==================== Cameras ==================== -->
+
+    <!-- Overhead camera - ceiling-mounted, looking straight down -->
+    <model name="overhead_cam">
+      <static>true</static>
+      <pose>0 0 8.5 0 1.5707963 0</pose>
+      <link name="link">
+        <sensor name="overhead_cam" type="camera">
+          <always_on>1</always_on>
+          <update_rate>30</update_rate>
+          <visualize>false</visualize>
+          <topic>overhead_cam</topic>
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>100</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+
+    <!-- Aisle camera - shelf-height view down the main aisle -->
+    <model name="aisle_cam">
+      <static>true</static>
+      <pose>4.7 -10.5 2.0 0 0.2 1.5707963</pose>
+      <link name="link">
+        <sensor name="aisle_cam" type="camera">
+          <always_on>1</always_on>
+          <update_rate>30</update_rate>
+          <visualize>false</visualize>
+          <topic>aisle_cam</topic>
+          <camera>
+            <horizontal_fov>1.3962634</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>100</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+
+    <!-- Entrance camera - corner-mounted angled view of the warehouse entrance -->
+    <model name="entrance_cam">
+      <static>true</static>
+      <pose>-7.5 10.0 4.0 0 0.4 -0.7854</pose>
+      <link name="link">
+        <sensor name="entrance_cam" type="camera">
+          <always_on>1</always_on>
+          <update_rate>30</update_rate>
+          <visualize>false</visualize>
+          <topic>entrance_cam</topic>
+          <camera>
+            <horizontal_fov>1.5707963</horizontal_fov>
+            <image>
+              <width>1280</width>
+              <height>720</height>
+              <format>R8G8B8</format>
+            </image>
+            <clip>
+              <near>0.1</near>
+              <far>100</far>
+            </clip>
+          </camera>
+        </sensor>
+      </link>
+    </model>
+
+  </world>
+</sdf>

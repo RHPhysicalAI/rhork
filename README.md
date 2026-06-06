@@ -111,12 +111,13 @@ helm install viewer ./charts/viewer \
 ### Spin up a simulation
 
 ```bash
-# CPU-only
+# Warehouse world (default)
 helm install alice-sim ./charts/gz-sim --set engineer=alice
 
-# With NVIDIA GPU
+# Quadcopter demo instead
 helm install bob-sim ./charts/gz-sim \
   --set engineer=bob \
+  --set world=quadcopter_demo \
   --set gpu.vendor=nvidia
 
 # Custom world file
@@ -135,10 +136,6 @@ open https://viewer-gz-sim.apps.<cluster>
 
 # Shell into a simulation pod
 oc rsh deploy/alice-sim-gazebo
-
-# Fly the quadcopter demo
-gz topic -t "/X3/gazebo/command/twist" -m gz.msgs.Twist \
-  -p "linear: {z: 0.5}"
 ```
 
 ### Teardown
@@ -228,11 +225,25 @@ podman build -t quay.io/<org>/gz-viewer:latest -f Containerfile.viewer .
 podman push quay.io/<org>/gz-viewer:latest
 ```
 
-## Demo worlds
+## Worlds
+
+### small_warehouse.sdf (default)
+
+Amazon small warehouse environment, ported from the [AWS RoboMaker Small Warehouse World](https://github.com/aws-robotics/aws-robomaker-small-warehouse-world) (MIT-0 license). Includes shelves, pallet jacks, boxes, buckets, and clutter arranged in a realistic warehouse layout. Three fixed surveillance cameras provide streaming coverage:
+
+- `overhead_cam` - ceiling-mounted, looking straight down at the warehouse floor
+- `aisle_cam` - shelf-height view down a main aisle between shelving units
+- `entrance_cam` - corner-mounted wide-angle view of the warehouse entrance
+
+The original Classic Gazebo (SDF 1.6) world has been adapted for Gazebo Sim 11 with rhork system plugins, camera sensors, and updated model definitions.
 
 ### quadcopter_demo.sdf
 
 X3 UAV quadcopter with velocity control, three cameras (front 1280x720, downward 640x480, tower overview 1280x720), ground objects, and a landing pad. Run `fly_patrol.sh` inside the pod for an autonomous rectangular patrol pattern.
+
+```bash
+helm install alice-sim ./charts/gz-sim --set engineer=alice --set world=quadcopter_demo
+```
 
 ### headless_camera.sdf
 

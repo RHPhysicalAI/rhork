@@ -1,6 +1,6 @@
 engineer: ""
 
-world: quadcopter_demo
+world: small_warehouse
 customWorldConfigMap: ""
 
 image:
