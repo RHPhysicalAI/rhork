@@ -78,6 +78,7 @@ Worlds are defined in Python (.gen files) for maximum flexibility. This enables 
 - `headless_camera.gen` - Minimal test scene with camera for encoding pipeline verification
 - `quadcopter_demo.gen` - X3 UAV with velocity control and autonomous patrol
 - `arm_reaching.gen` - 7-DOF arm reaching task with target objects and rewards
+- `warehouse.gen` - Procedural small warehouse with shelves, walls, obstacles, and three surveillance cameras (ported from Gazebo SDF)
 
 ### Learning with Genesis
 
