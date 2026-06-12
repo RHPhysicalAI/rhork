@@ -1,0 +1,150 @@
+"""
+Procedurally generated small warehouse world for Genesis AI.
+
+Ported from the Gazebo SDF version (AWS RoboMaker Small Warehouse World).
+Uses approximate box geometries for shelves, walls, and obstacles rather than
+mesh imports. Camera positions match the original Gazebo world.
+
+Ground: 20×20m
+Shelves: 3 tall (F-type) and 6 medium (D/E-type) arranged in pattern
+Cameras: overhead (8.5m up), aisle (2m height, side view), entrance (corner view)
+"""
+
+import genesis as gs
+import numpy as np
+from math import pi, cos, sin
+
+
+def create_world():
+    world = gs.World()
+    world.opt.gravity = np.array([0.0, 0.0, -9.81])
+
+    # Ground plane (20m x 20m x 0.1m)
+    ground = world.add_entity(
+        gs.morphs.Box(size=[20, 20, 0.1]),
+        pos=[0, 0, -0.05],
+        fixed=True
+    )
+    ground.material.color = np.array([0.8, 0.8, 0.8, 1.0])
+
+    # Warehouse walls (approximate as 4 low walls)
+    # North wall
+    north_wall = world.add_entity(
+        gs.morphs.Box(size=[20, 0.2, 2.5]),
+        pos=[0, 10, 1.25],
+        fixed=True
+    )
+    north_wall.material.color = np.array([0.6, 0.6, 0.6, 1.0])
+
+    # South wall
+    south_wall = world.add_entity(
+        gs.morphs.Box(size=[20, 0.2, 2.5]),
+        pos=[0, -10, 1.25],
+        fixed=True
+    )
+    south_wall.material.color = np.array([0.6, 0.6, 0.6, 1.0])
+
+    # East wall
+    east_wall = world.add_entity(
+        gs.morphs.Box(size=[0.2, 20, 2.5]),
+        pos=[10, 0, 1.25],
+        fixed=True
+    )
+    east_wall.material.color = np.array([0.6, 0.6, 0.6, 1.0])
+
+    # West wall
+    west_wall = world.add_entity(
+        gs.morphs.Box(size=[0.2, 20, 2.5]),
+        pos=[-10, 0, 1.25],
+        fixed=True
+    )
+    west_wall.material.color = np.array([0.6, 0.6, 0.6, 1.0])
+
+    # Tall shelves (F-type) - 2.0m tall
+    tall_shelf_poses = [
+        [-5.8, -1.0, 0],  # ShelfF_01
+        [3.0, 7.0, 0],    # Additional tall shelf
+    ]
+
+    for i, pos in enumerate(tall_shelf_poses):
+        shelf = world.add_entity(
+            gs.morphs.Box(size=[0.5, 1.5, 2.0]),
+            pos=pos,
+            fixed=True
+        )
+        shelf.material.color = np.array([0.4, 0.4, 0.4, 1.0])
+
+    # Medium shelves (D/E-type) - 1.5m tall, arranged in right cluster
+    medium_shelf_poses = [
+        [4.7, 0.6, 0],      # ShelfE_01_001
+        [4.7, -4.8, 0],     # ShelfE_01_002
+        [4.7, -8.7, 0],     # ShelfE_01_003
+        [4.7, -1.2, 0],     # ShelfD_01_001
+        [4.7, -3.0, 0],     # ShelfD_01_002
+        [4.7, -6.8, 0],     # ShelfD_01_003
+    ]
+
+    for i, pos in enumerate(medium_shelf_poses):
+        shelf = world.add_entity(
+            gs.morphs.Box(size=[0.4, 1.2, 1.5]),
+            pos=pos,
+            fixed=True
+        )
+        shelf.material.color = np.array([0.45, 0.45, 0.45, 1.0])
+
+    # Small obstacles scattered (approximate clutter objects)
+    obstacle_poses = [
+        [5.7, 8.6, 0.1],    # ClutteringA_01_016
+        [3.4, 8.6, 0.1],    # ClutteringA_01_017
+        [-1.5, 5.2, 0.1],   # ClutteringA_01_018
+        [3.3, 3.8, 0.1],    # ClutteringC_01_027
+        [5.5, 3.8, 0.1],    # ClutteringC_01_028
+        [5.4, 6.1, 0.1],    # ClutteringC_01_029
+        [3.2, 6.1, 0.1],    # ClutteringC_01_030
+        [-1.6, 2.3, 0.1],   # ClutteringC_01_031
+        [-1.2, 9.4, 0.1],   # ClutteringC_01_032
+        [-1.6, -7.8, 0.1],  # ClutteringD_01_005
+        [-1.6, 7.7, 0.1],   # TrashCanC_01_002
+    ]
+
+    for i, pos in enumerate(obstacle_poses):
+        obstacle = world.add_entity(
+            gs.morphs.Box(size=[0.3, 0.3, 0.3]),
+            pos=pos,
+            fixed=True
+        )
+        obstacle.material.color = np.array([0.7, 0.5, 0.3, 1.0])
+
+    # ==================== CAMERAS ====================
+
+    # Overhead camera (ceiling-mounted, looking straight down)
+    overhead_cam = world.add_entity(
+        gs.morphs.Camera(
+            resolution=[1280, 720],
+            name="overhead_cam"
+        ),
+        pos=[0, 0, 8.5],
+        rot_euler=[pi/2, 0, 0]
+    )
+
+    # Aisle camera (shelf-height view down the main aisle)
+    aisle_cam = world.add_entity(
+        gs.morphs.Camera(
+            resolution=[1280, 720],
+            name="aisle_cam"
+        ),
+        pos=[4.7, -10.5, 2.0],
+        rot_euler=[0.2, 0, pi/2]
+    )
+
+    # Entrance camera (corner-mounted angled view)
+    entrance_cam = world.add_entity(
+        gs.morphs.Camera(
+            resolution=[1280, 720],
+            name="entrance_cam"
+        ),
+        pos=[-7.5, 10.0, 4.0],
+        rot_euler=[0.4, 0, -pi/4]
+    )
+
+    return world
