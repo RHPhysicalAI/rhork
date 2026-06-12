@@ -1,0 +1,22 @@
+FROM registry.access.redhat.com/ubi10:latest
+
+# Install Python and build tools
+RUN yum install -y python3.11 python3.11-devel python3.11-pip \
+    ffmpeg gcc g++ make
+
+# Install Genesis and dependencies
+RUN pip3.11 install --no-cache-dir \
+    genesis-world==0.3.0 \
+    numpy \
+    opencv-python
+
+# Create app directory
+WORKDIR /app
+
+# Copy scripts
+COPY genesis_streamer.py /app/
+COPY entrypoint.sh /app/
+
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]
