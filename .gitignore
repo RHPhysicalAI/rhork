@@ -2,6 +2,17 @@ tmp/
 .DS_Store
 .playwright-mcp/
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+
 # Helm
 charts/*/charts/
 *.tgz
