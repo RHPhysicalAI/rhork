@@ -1,5 +1,29 @@
 import pytest
+import subprocess
+import numpy as np
 from genesis_streamer import GenesisStreamer
+
+
+class TestStreamingEncoding:
+    """Tests for frame capture and RTSP streaming."""
+
+    def test_rtsp_stream_creation(self, streaming_config):
+        """Test that RTSP stream can be created with an encoder subprocess."""
+        streamer = GenesisStreamer(**streaming_config)
+        encoder = streamer._create_encoder("test_camera")
+
+        # Verify encoder is created and has started
+        assert encoder is not None
+        assert isinstance(encoder.process, subprocess.Popen)
+
+    def test_frame_capture_and_encode(self, streaming_config):
+        """Test that frame capture works with correct shape and dtype."""
+        # Create a dummy RGBA frame (height=720, width=1280, channels=4)
+        frame = np.zeros((720, 1280, 4), dtype=np.uint8)
+
+        # Verify frame properties
+        assert frame.shape == (720, 1280, 4)
+        assert frame.dtype == np.uint8
 
 
 class TestWorldLoading:

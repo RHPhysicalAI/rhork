@@ -10,6 +10,7 @@ import importlib.util
 import logging
 import os
 import signal
+import subprocess
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -21,6 +22,149 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+class FFmpegEncoder:
+    """
+    FFmpeg-based encoder for H.264 video streaming via RTSP.
+
+    Handles encoding of raw RGBA frames to H.264 and pushing to RTSP server.
+    """
+
+    def __init__(
+        self,
+        stream_name: str,
+        mediamtx_host: str,
+        bitrate: str,
+        fps: int,
+        width: int = 1280,
+        height: int = 720,
+    ):
+        """
+        Initialize FFmpegEncoder.
+
+        Args:
+            stream_name: Stream name for RTSP path (e.g., "genesis-stream/camera1")
+            mediamtx_host: MediaMTX server address (e.g., "localhost:8554")
+            bitrate: Encoding bitrate (e.g., "5000k")
+            fps: Frames per second for encoding
+            width: Video width in pixels (default: 1280)
+            height: Video height in pixels (default: 720)
+        """
+        self.stream_name = stream_name
+        self.mediamtx_host = mediamtx_host
+        self.bitrate = bitrate
+        self.fps = fps
+        self.width = width
+        self.height = height
+
+        # Construct RTSP URL
+        self.rtsp_url = f"rtsp://{mediamtx_host}/live/{stream_name}"
+
+        # Build ffmpeg command
+        self.command = [
+            "ffmpeg",
+            "-f", "rawvideo",
+            "-pixel_format", "rgba",
+            "-video_size", f"{width}x{height}",
+            "-framerate", str(fps),
+            "-i", "pipe:0",
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-b:v", bitrate,
+            "-rtsp_transport", "tcp",
+            "-f", "rtsp",
+            self.rtsp_url,
+        ]
+
+        self.process = None
+        logger.info(
+            f"FFmpegEncoder initialized: stream={stream_name}, "
+            f"size={width}x{height}, bitrate={bitrate}, fps={fps}"
+        )
+
+    def start(self) -> None:
+        """
+        Start the FFmpeg encoding subprocess.
+
+        Raises:
+            RuntimeError: If the process fails to start
+        """
+        try:
+            self.process = subprocess.Popen(
+                self.command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0,  # Unbuffered
+            )
+            logger.info(f"FFmpeg process started for stream: {self.stream_name}")
+        except Exception as e:
+            logger.error(f"Failed to start FFmpeg process: {e}")
+            raise RuntimeError(f"Failed to start FFmpeg encoder: {e}")
+
+    def push_frame(self, frame) -> None:
+        """
+        Push a raw RGBA frame to the encoder.
+
+        Args:
+            frame: Numpy array with shape (height, width, 4) and dtype uint8
+
+        Raises:
+            ValueError: If frame shape or dtype is invalid
+            BrokenPipeError: If the encoder process has crashed
+        """
+        if frame.shape != (self.height, self.width, 4):
+            raise ValueError(
+                f"Invalid frame shape: expected ({self.height}, {self.width}, 4), "
+                f"got {frame.shape}"
+            )
+
+        if frame.dtype != "uint8":
+            raise ValueError(
+                f"Invalid frame dtype: expected uint8, got {frame.dtype}"
+            )
+
+        try:
+            self.process.stdin.write(frame.tobytes())
+            self.process.stdin.flush()
+        except BrokenPipeError:
+            logger.error(f"Encoder process crashed for stream: {self.stream_name}")
+            raise
+
+    def stop(self, timeout: int = 5) -> None:
+        """
+        Stop the FFmpeg encoding subprocess.
+
+        Args:
+            timeout: Timeout in seconds for process termination (default: 5)
+        """
+        if self.process is None:
+            return
+
+        try:
+            # Close stdin to signal end of stream
+            if self.process.stdin:
+                self.process.stdin.close()
+
+            # Wait for process to terminate gracefully
+            self.process.wait(timeout=timeout)
+            logger.info(f"FFmpeg process stopped for stream: {self.stream_name}")
+        except subprocess.TimeoutExpired:
+            logger.warning(
+                f"FFmpeg process did not terminate within {timeout}s, "
+                f"forcing termination for stream: {self.stream_name}"
+            )
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                logger.error(
+                    f"FFmpeg process still running, killing: {self.stream_name}"
+                )
+                self.process.kill()
+        except Exception as e:
+            logger.error(f"Error stopping FFmpeg process: {e}")
 
 
 class GenesisStreamer:
@@ -59,6 +203,7 @@ class GenesisStreamer:
 
         self._running = True
         self._world = None
+        self.encoders: Dict[str, FFmpegEncoder] = {}
 
         # Register signal handlers
         signal.signal(signal.SIGTERM, self.handle_signal)
@@ -178,6 +323,32 @@ class GenesisStreamer:
         cameras = self._world.get("cameras", [])
         logger.info(f"Discovered {len(cameras)} cameras in world")
         return cameras
+
+    def _create_encoder(self, camera_name: str) -> FFmpegEncoder:
+        """
+        Create an FFmpeg encoder for a camera stream.
+
+        Args:
+            camera_name: Name of the camera
+
+        Returns:
+            FFmpegEncoder instance that has been started
+
+        Raises:
+            RuntimeError: If encoder fails to start
+        """
+        stream_name = f"{self.stream_prefix}/{camera_name}"
+        encoder = FFmpegEncoder(
+            stream_name=stream_name,
+            mediamtx_host=self.mediamtx_host,
+            bitrate=self.encoding_bitrate,
+            fps=self.encoding_fps,
+        )
+        encoder.start()
+        self.encoders[camera_name] = encoder
+
+        logger.info(f"Created and started encoder for camera: {camera_name}")
+        return encoder
 
     def run(self) -> None:
         """
