@@ -1,6 +1,8 @@
 import pytest
 import subprocess
 import numpy as np
+import threading
+import time
 from genesis_streamer import GenesisStreamer
 
 
@@ -67,3 +69,27 @@ class TestWorldLoading:
 
         with pytest.raises(FileNotFoundError):
             streamer._load_world()
+
+
+class TestStreamingLoop:
+    """Tests for the main streaming loop."""
+
+    def test_streaming_loop_basic(self, streaming_config):
+        """Test that streaming loop can run and be stopped gracefully."""
+        streamer = GenesisStreamer(**streaming_config)
+
+        # Start the loop in a separate thread
+        loop_thread = threading.Thread(target=streamer.run)
+        loop_thread.start()
+
+        # Let it run for 0.5 seconds
+        time.sleep(0.5)
+
+        # Stop the loop by setting _running to False
+        streamer._running = False
+
+        # Wait for thread to finish
+        loop_thread.join(timeout=2)
+
+        # Verify thread is no longer alive (completed execution)
+        assert not loop_thread.is_alive()

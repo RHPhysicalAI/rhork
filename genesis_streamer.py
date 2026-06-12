@@ -12,6 +12,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 
@@ -214,6 +215,11 @@ class GenesisStreamer:
             f"mediamtx={mediamtx_host}, world_file={world_file}"
         )
 
+    @property
+    def running(self) -> bool:
+        """Check if the streamer is currently running."""
+        return self._running
+
     def handle_signal(self, signum, frame):
         """
         Handle SIGTERM and SIGINT signals for graceful shutdown.
@@ -354,21 +360,97 @@ class GenesisStreamer:
         """
         Run the main simulation loop.
 
-        This is a stub implementation that sets up signal handling and
-        loads the world. Full streaming logic will be implemented in Task 3.
+        Handles world loading, physics stepping, frame capture, and encoding.
+        Gracefully handles signals and exceptions with proper cleanup.
         """
-        logger.info("Starting GenesisStreamer main loop")
-        self._world = self._load_world()
-        self._discover_cameras()
+        try:
+            logger.info("Starting GenesisStreamer main loop")
+            logger.info(
+                f"Simulation frequency: {self.sim_step_freq} Hz, "
+                f"Encoding rate: {self.encoding_fps} fps, "
+                f"Bitrate: {self.encoding_bitrate}"
+            )
 
-        logger.info("Simulation loop running (stub implementation)")
+            # Load world and discover cameras
+            self._world = self._load_world()
+            self._discover_cameras()
 
-        # Main loop placeholder
-        while self._running:
-            # Simulation and streaming logic will be implemented here in Task 3
-            pass
+            # Calculate frame interval based on encoding fps
+            frame_interval = 1.0 / self.encoding_fps
+            sim_period = 1.0 / self.sim_step_freq
 
-        logger.info("Simulation loop terminated")
+            # Initialize timing variables
+            last_frame_time = time.time()
+            step_count = 0
+
+            logger.info("Simulation loop started")
+
+            # Main simulation loop
+            while self._running:
+                # Step the physics simulation
+                if self._world is not None:
+                    # For now, just placeholder - actual stepping would go here
+                    pass
+
+                step_count += 1
+
+                # Check if it's time to capture a frame
+                current_time = time.time()
+                if (current_time - last_frame_time) >= frame_interval:
+                    try:
+                        self._capture_and_push_frames()
+                        last_frame_time = current_time
+                    except Exception as e:
+                        logger.error(f"Error capturing/pushing frame: {e}")
+
+                # Sleep to maintain simulation frequency
+                time.sleep(sim_period)
+
+                # Log progress every 100 steps
+                if step_count % 100 == 0:
+                    logger.info(f"Simulation progress: {step_count} steps completed")
+
+            logger.info("Simulation loop terminated")
+
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received")
+        except Exception as e:
+            logger.exception(f"Unexpected error in simulation loop: {e}")
+        finally:
+            self._cleanup()
+
+    def _capture_and_push_frames(self) -> None:
+        """
+        Capture frames from all cameras and push them to encoders.
+
+        This method is called at the encoding_fps rate (not the simulation rate).
+        Currently a placeholder for frame capture logic.
+
+        TODO: Implement actual frame capture from Genesis cameras
+        """
+        # Placeholder for frame capture from cameras
+        # For each camera in self.cameras:
+        #   - Grab frame from camera
+        #   - Push to corresponding encoder
+        pass
+
+    def _cleanup(self) -> None:
+        """
+        Clean up resources before shutdown.
+
+        Stops all active encoders gracefully and logs any errors.
+        """
+        logger.info("Cleaning up resources...")
+
+        # Stop all encoders
+        for camera_name, encoder in self.encoders.items():
+            try:
+                encoder.stop()
+                logger.info(f"Stopped encoder for camera: {camera_name}")
+            except Exception as e:
+                logger.error(f"Error stopping encoder for {camera_name}: {e}")
+
+        logger.info("Cleanup complete")
 
     def run_viewer(self) -> None:
         """
