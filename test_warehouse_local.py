@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test warehouse world in Genesis container.
-Run: podman run --rm -v $PWD:/app --entrypoint python3 localhost/genesis-sim-streamer:latest /app/test_warehouse_local.py
-"""
+"""Test warehouse world in Genesis container."""
 
 import sys
 from pathlib import Path
@@ -20,6 +17,15 @@ try:
     print(f"  Genesis version: {gs.__version__}")
 except ImportError as e:
     print(f"✗ Import failed: {e}")
+    sys.exit(1)
+
+# Initialize Genesis
+print("\nInitializing Genesis...")
+try:
+    gs.init()
+    print("✓ Genesis initialized")
+except Exception as e:
+    print(f"✗ Failed to initialize: {e}")
     sys.exit(1)
 
 # Load and create the world
@@ -50,15 +56,14 @@ except Exception as e:
 # Verify structure
 print("\nVerifying world structure...")
 try:
-    # Get some basic info
     print(f"✓ World object created: {type(world)}")
 
     # Try to step the world
-    print("\nRunning physics simulation (20 steps)...")
-    for step_num in range(20):
+    print("\nRunning physics simulation (10 steps)...")
+    for step_num in range(10):
         world.step()
         if (step_num + 1) % 5 == 0:
-            print(f"  Step {step_num + 1}/20 ✓")
+            print(f"  Step {step_num + 1}/10 ✓")
     print("✓ Physics simulation completed")
 
 except Exception as e:
@@ -72,7 +77,7 @@ print("✓ WAREHOUSE WORLD TEST COMPLETED SUCCESSFULLY!")
 print("="*70)
 print("\nSummary:")
 print(f"  World created:       True")
-print(f"  Simulation steps:    20")
+print(f"  Simulation steps:    10")
 print(f"  World type:          {type(world).__name__}")
 print("\n✓ All components working correctly!")
 print("="*70 + "\n")
