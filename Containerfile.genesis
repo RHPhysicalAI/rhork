@@ -1,12 +1,14 @@
-FROM registry.access.redhat.com/ubi10:latest
+FROM python:3.11-slim
 
-# Install Python and build tools
-RUN yum install -y python3.11 python3.11-devel python3.11-pip \
-    ffmpeg gcc g++ make
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Genesis and dependencies
-RUN pip3.11 install --no-cache-dir \
-    genesis-world==0.3.0 \
+# Install PyTorch (CPU) and Genesis dependencies
+RUN pip install --no-cache-dir \
+    torch \
+    genesis-world \
     numpy \
     opencv-python
 
