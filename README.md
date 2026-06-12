@@ -31,6 +31,73 @@ Video capture and encoding are handled by the [gz-camera-stream](https://github.
 
 Shared services (coturn, MediaMTX, viewer) are deployed once per namespace. Simulation instances are spun up as independent Helm releases.
 
+## Genesis AI Integration
+
+In addition to Gazebo Sim, rhork supports Genesis AI as an alternative physics backend. Genesis enables exploration of differentiable physics workflows for robotics research and learning-based control:
+
+- **Differentiable Physics** - Native automatic differentiation through the physics solver for gradient-based optimization
+- **Flexible Robot Definitions** - Python API for rapid iteration on morphologies and control schemes
+- **Fast Physics** - Configurable solvers with performance optimized for control loops and learning
+
+### Why Genesis?
+
+| Aspect | Gazebo Sim | Genesis AI |
+|--------|-----------|-----------|
+| Physics Solvers | Rigid body (ODE, Bullet) | Multiple solvers + autodiff |
+| Robot Definition | SDF files (XML) | Python API (flexible) |
+| Rendering | OpenGL/OGRE | Rasterizer/RayTracer |
+| Differentiable Physics | No | Yes (native autograd) |
+| Performance | ~1000 Hz | ~500-1000 Hz (solver dependent) |
+
+### Running Genesis
+
+Genesis simulations are deployed the same way as Gazebo Sim instances - as isolated Helm releases on Kubernetes. The shared infrastructure (MediaMTX, coturn, viewer) remains the same:
+
+```bash
+# Create namespace
+oc new-project genesis-sim
+
+# Deploy shared services (same as Gazebo)
+helm install mediamtx ./charts/mediamtx \
+  --set coturn.host=<node-ip>
+
+helm install viewer ./charts/viewer \
+  --set mediamtx.base=https://mediamtx-genesis-sim.apps.<cluster> \
+  --set mediamtx.api=https://mediamtx-api-genesis-sim.apps.<cluster>
+
+# Deploy a Genesis simulation instance
+helm install arm-demo ./charts/genesis-sim \
+  --set sim=arm-demo \
+  --set world=arm_reaching
+```
+
+### Genesis Worlds
+
+Worlds are defined in Python (.gen files) for maximum flexibility. This enables rapid iteration on environment configurations, custom object placement, and dynamic world properties:
+
+- `headless_camera.gen` - Minimal test scene with camera for encoding pipeline verification
+- `quadcopter_demo.gen` - X3 UAV with velocity control and autonomous patrol
+- `arm_reaching.gen` - 7-DOF arm reaching task with target objects and rewards
+
+### Learning with Genesis
+
+Genesis exposes the physics state and solver through a Python API, making it ideal for training learning-based controllers. Gradients flow through the physics for trajectory optimization and policy learning. See `arm_reaching_demo.py` for an example of trajectory optimization and `rl_training_example.py` for reinforcement learning workflows.
+
+### Container Images
+
+Genesis simulation is packaged similarly to Gazebo, with a single container image supporting CPU and GPU modes:
+
+```bash
+podman build -t quay.io/<org>/genesis-sim-streamer:latest -f Containerfile.genesis .
+podman push quay.io/<org>/genesis-sim-streamer:latest
+```
+
+### Known Limitations
+
+- Viewer not available on Windows (WebRTC/browser compatibility)
+- Python interpreter adds ~10-20% overhead compared to compiled C++ solvers
+- Telemetry streaming not yet implemented (video works, topic tree coming in next release)
+
 ## Viewer
 
 The viewer is a single-file web UI that connects to both MediaMTX (for WebRTC video) and each Gazebo instance's WebSocket server (for gz-transport telemetry). It provides:
