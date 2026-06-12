@@ -1,0 +1,114 @@
+"""
+Quadcopter Demo World for Genesis Simulation
+
+This world represents a realistic quadcopter flight scenario with:
+- A 50x50m ground plane for navigation
+- A 2x2m landing pad at the origin
+- 5 scattered obstacle boxes for obstacle avoidance testing
+- An X3 quadcopter body with 4 rotors
+- 3 cameras: 2 mounted on the drone (front and downward), 1 static overhead
+- Gravity enabled for realistic physics simulation
+
+This world is used for benchmarking and testing quadcopter control systems.
+"""
+
+import genesis as gs
+
+
+def create_world():
+    """Create and return the quadcopter demo world."""
+    world = gs.World()
+
+    # Ground plane: 50x50 green box, fixed
+    ground_box = gs.morphs.Box(
+        size=[50, 50, 0.2],
+        pos=[0, 0, -0.1],
+        fixed=True,
+    )
+    ground_mat = gs.materials.Rigid(color=[0.3, 0.6, 0.3, 1.0])
+    world.add_entity(morph=ground_box, material=ground_mat)
+
+    # Landing pad: 2x2 white box at origin, fixed
+    landing_pad = gs.morphs.Box(
+        size=[2, 2, 0.05],
+        pos=[0, 0, 0.025],
+        fixed=True,
+    )
+    landing_pad_mat = gs.materials.Rigid(color=[1.0, 1.0, 1.0, 1.0])
+    world.add_entity(morph=landing_pad, material=landing_pad_mat)
+
+    # Obstacles: 5 scattered brown boxes
+    obstacle_positions = [
+        [5, 5, 0.5],
+        [5, -5, 0.5],
+        [-5, 5, 0.5],
+        [-5, -5, 0.5],
+        [10, 0, 0.3],
+    ]
+    obstacle_mat = gs.materials.Rigid(color=[0.8, 0.4, 0.2, 1.0])
+
+    for obs_pos in obstacle_positions:
+        obstacle = gs.morphs.Box(
+            size=[0.5, 0.5, 1.0],
+            pos=obs_pos,
+            fixed=True,
+        )
+        world.add_entity(morph=obstacle, material=obstacle_mat)
+
+    # Quadcopter body: 0.3x0.3x0.1 dark gray box at [0, 0, 1.0]
+    quad_body = gs.morphs.Box(
+        size=[0.3, 0.3, 0.1],
+        pos=[0, 0, 1.0],
+    )
+    quad_mat = gs.materials.Rigid(color=[0.2, 0.2, 0.2, 1.0])
+    world.add_entity(morph=quad_body, material=quad_mat, name="quad_body")
+
+    # Rotor positions relative to body: [x, y, z]
+    rotor_positions = [
+        [0.2, 0.2, 0.05],    # Front-right
+        [0.2, -0.2, 0.05],   # Rear-right
+        [-0.2, 0.2, 0.05],   # Front-left
+        [-0.2, -0.2, 0.05],  # Rear-left
+    ]
+
+    # 4 rotors as capsules, parented to quad_body
+    rotor_mat = gs.materials.Rigid(color=[0.1, 0.1, 0.1, 1.0])
+    for i, rotor_pos in enumerate(rotor_positions):
+        rotor = gs.morphs.Capsule(
+            radius=0.15,
+            length=0.02,
+            pos=rotor_pos,
+        )
+        world.add_entity(morph=rotor, material=rotor_mat, parent="quad_body")
+
+    # Front camera: 1280x720, on quad_body, facing forward
+    front_camera = gs.morphs.Camera(
+        resolution=[1280, 720],
+        pos=[0.15, 0, 0],
+        rot_euler=[0, 0, 0],
+        name="front_camera",
+    )
+    world.add_entity(morph=front_camera, parent="quad_body")
+
+    # Down camera: 640x480, on quad_body, facing down
+    down_camera = gs.morphs.Camera(
+        resolution=[640, 480],
+        pos=[0, 0, -0.05],
+        rot_euler=[0, 1.57, 0],
+        name="down_camera",
+    )
+    world.add_entity(morph=down_camera, parent="quad_body")
+
+    # Overhead static camera: 1280x720, fixed position, facing down
+    overhead_camera = gs.morphs.Camera(
+        resolution=[1280, 720],
+        pos=[0, 0, 5],
+        rot_euler=[0, 1.57, 0],
+        name="overhead_camera",
+    )
+    world.add_entity(morph=overhead_camera)
+
+    # Set gravity
+    world.gravity = [0, 0, -9.81]
+
+    return world
