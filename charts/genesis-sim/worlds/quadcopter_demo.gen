@@ -1,0 +1,43 @@
+"""
+Quadcopter Demo World for Genesis Simulation
+
+Procedural environment for quadcopter flight testing:
+- 50x50m ground plane
+- 2x2m landing pad at origin
+- 5 obstacle columns for avoidance testing
+- Quadcopter body represented as a box at hover height
+- 3 cameras: front-view, downward, and static overhead
+"""
+
+import genesis as gs
+
+
+def create_world():
+    """Create and return the scene and camera list."""
+    scene = gs.Scene()
+
+    # Ground plane
+    ground = gs.morphs.Box(size=[50, 50, 0.2], pos=[0, 0, -0.1])
+    scene.add_entity(morph=ground, material=gs.materials.Rigid())
+
+    # Landing pad at origin
+    pad = gs.morphs.Box(size=[2, 2, 0.05], pos=[0, 0, 0.025])
+    scene.add_entity(morph=pad, material=gs.materials.Rigid())
+
+    # Obstacle columns
+    for pos in [[5, 5, 0.5], [5, -5, 0.5], [-5, 5, 0.5],
+                [-5, -5, 0.5], [10, 0, 0.3]]:
+        col = gs.morphs.Box(size=[0.5, 0.5, 1.0], pos=pos)
+        scene.add_entity(morph=col, material=gs.materials.Rigid())
+
+    # Quadcopter body (simplified as a box at hover height)
+    quad = gs.morphs.Box(size=[0.3, 0.3, 0.1], pos=[0, 0, 1.0])
+    scene.add_entity(morph=quad, material=gs.materials.Rigid())
+
+    cameras = [
+        scene.add_camera(res=(1280, 720), pos=(2, 0, 1.5), lookat=(0, 0, 1.0)),
+        scene.add_camera(res=(640, 480), pos=(0, 0, 0.8), lookat=(0, 0, 0)),
+        scene.add_camera(res=(1280, 720), pos=(0, 0, 15), lookat=(0, 0, 0)),
+    ]
+
+    return {"scene": scene, "cameras": cameras}

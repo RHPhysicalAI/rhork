@@ -1,0 +1,38 @@
+"""
+Arm Reaching Task World for Genesis Simulation
+
+Environment for a reaching task with differentiable physics:
+- 5x5m ground plane
+- Two link segments representing a 2-link arm
+- A target object the arm should reach toward
+- Camera positioned to observe the workspace
+"""
+
+import genesis as gs
+
+
+def create_world():
+    """Create and return the scene and camera list."""
+    scene = gs.Scene()
+
+    # Ground plane
+    ground = gs.morphs.Box(size=[5, 5, 0.1], pos=[0, 0, -0.05])
+    scene.add_entity(morph=ground, material=gs.materials.Rigid())
+
+    # Link 1 (base segment)
+    link1 = gs.morphs.Box(size=[0.1, 0.1, 0.5], pos=[0, 0, 0.25])
+    scene.add_entity(morph=link1, material=gs.materials.Rigid())
+
+    # Link 2 (end-effector segment)
+    link2 = gs.morphs.Box(size=[0.08, 0.08, 0.4], pos=[0, 0, 0.7])
+    scene.add_entity(morph=link2, material=gs.materials.Rigid())
+
+    # Target object
+    target = gs.morphs.Box(size=[0.1, 0.1, 0.1], pos=[0.5, 0.5, 0.3])
+    scene.add_entity(morph=target, material=gs.materials.Rigid())
+
+    cameras = [
+        scene.add_camera(res=(1280, 720), pos=(1.5, -1.0, 1.0), lookat=(0, 0, 0.4)),
+    ]
+
+    return {"scene": scene, "cameras": cameras}

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.sim | default "genesis" }}-worlds
+  labels:
+    {{- include "genesis.labels" . | nindent 4 }}
+data:
+  headless_camera.gen: |
+    {{- .Files.Get "worlds/headless_camera.gen" | nindent 4 }}
+  quadcopter_demo.gen: |
+    {{- .Files.Get "worlds/quadcopter_demo.gen" | nindent 4 }}
+  arm_reaching.gen: |
+    {{- .Files.Get "worlds/arm_reaching.gen" | nindent 4 }}
+  warehouse.gen: |
+    {{- .Files.Get "worlds/warehouse.gen" | nindent 4 }}

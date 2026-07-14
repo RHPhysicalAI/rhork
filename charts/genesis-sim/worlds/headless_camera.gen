@@ -1,0 +1,33 @@
+"""
+Minimal test scene for Genesis streaming pipeline.
+
+This world provides a simple setup for testing camera streaming:
+- A fixed ground plane for reference
+- Three falling boxes to demonstrate physics
+- An overhead camera positioned to capture all falling objects
+"""
+
+import genesis as gs
+
+
+def create_world():
+    """Create and return the scene and camera list."""
+    scene = gs.Scene()
+
+    ground = gs.morphs.Box(size=[10, 10, 0.1], pos=[0, 0, -0.05])
+    scene.add_entity(morph=ground, material=gs.materials.Rigid())
+
+    positions = [
+        [0, 0, 0.5],
+        [0, 0, 0.8],
+        [0, 0, 1.1],
+    ]
+    for pos in positions:
+        box = gs.morphs.Box(size=[0.1, 0.1, 0.1], pos=pos)
+        scene.add_entity(morph=box, material=gs.materials.Rigid())
+
+    cameras = [
+        scene.add_camera(res=(1280, 720), pos=(0, 0, 2), lookat=(0, 0, 0.5)),
+    ]
+
+    return {"scene": scene, "cameras": cameras}

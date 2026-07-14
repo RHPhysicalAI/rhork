@@ -1,0 +1,41 @@
+sim: ""
+
+world: headless_camera
+# Available worlds: headless_camera, quadcopter_demo, arm_reaching, warehouse
+customWorldConfigMap: ""
+
+image:
+  repository: quay.io/genesis/genesis-streamer
+  tag: latest
+  pullPolicy: IfNotPresent
+
+gpu:
+  enabled: false
+  vendor: none    # none | nvidia | amd
+  amd:
+    nodeSelector:
+      feature.node.kubernetes.io/pci-0380_1002_1586.present: "true"
+  nvidia:
+    nodeSelector:
+      nvidia.com/gpu.present: "true"
+
+resources:
+  requests:
+    cpu: "2"
+    memory: 4Gi
+  limits:
+    cpu: "4"
+    memory: 8Gi
+
+genesis:
+  timestep: 100
+
+mediamtx:
+  host: mediamtx-webrtc.genesis-sim.svc.cluster.local
+  rtspPort: 8554
+
+persistence:
+  enabled: false
+  keep: true
+  size: 5Gi
+  storageClass: ""
