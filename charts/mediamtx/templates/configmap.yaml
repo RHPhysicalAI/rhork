@@ -33,9 +33,9 @@ data:
     webrtcIPsFromInterfaces: yes
     webrtcAdditionalHosts: []
 
-    {{- if .Values.coturn.host }}
+    {{- if or .Values.coturn.discovery .Values.coturn.host }}
     webrtcICEServers2:
-      - url: turn:{{ .Values.coturn.host }}:{{ .Values.coturn.port }}
+      - url: turn:{{ if .Values.coturn.discovery }}__COTURN_HOST__{{ else }}{{ .Values.coturn.host }}{{ end }}:{{ .Values.coturn.port }}
         username: {{ .Values.coturn.username }}
         password: {{ .Values.coturn.password }}
     {{- end }}

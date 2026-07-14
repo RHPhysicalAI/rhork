@@ -14,6 +14,42 @@ spec:
       labels:
         {{- include "mediamtx.selectorLabels" . | nindent 8 }}
     spec:
+      {{- if .Values.coturn.discovery }}
+      serviceAccountName: {{ include "mediamtx.fullname" . }}
+      initContainers:
+      - name: discover-coturn
+        image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
+        command: ["sh", "-c"]
+        args:
+        - |
+          microdnf install -y curl --setopt=install_weak_deps=0 > /dev/null 2>&1
+          TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+          NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+          API="https://kubernetes.default.svc/api/v1/namespaces/${NS}/pods"
+          echo "Waiting for coturn pod..."
+          for i in $(seq 1 30); do
+            COTURN_IP=$(curl -sf -k \
+              -H "Authorization: Bearer ${TOKEN}" \
+              "${API}?labelSelector=app.kubernetes.io/name=coturn&fieldSelector=status.phase=Running" \
+              | sed -n 's/.*"hostIP"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -1)
+            if [ -n "$COTURN_IP" ]; then
+              echo "Found coturn at $COTURN_IP"
+              break
+            fi
+            echo "Attempt $i/30: coturn not found, retrying in 10s..."
+            sleep 10
+          done
+          if [ -z "$COTURN_IP" ]; then
+            echo "ERROR: coturn pod not found after 5 minutes"
+            exit 1
+          fi
+          sed "s/__COTURN_HOST__/$COTURN_IP/g" /config-template/mediamtx.yml > /config/mediamtx.yml
+        volumeMounts:
+        - name: config-template
+          mountPath: /config-template
+        - name: config-rendered
+          mountPath: /config
+      {{- end }}
       containers:
       - name: mediamtx
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
@@ -29,13 +65,17 @@ spec:
         - containerPort: 8888
           name: hls
         volumeMounts:
-        - name: config
+        - name: {{ if .Values.coturn.discovery }}config-rendered{{ else }}config-template{{ end }}
           mountPath: /mediamtx.yml
           subPath: mediamtx.yml
           readOnly: true
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       volumes:
-      - name: config
+      - name: config-template
         configMap:
           name: {{ include "mediamtx.fullname" . }}-config
+      {{- if .Values.coturn.discovery }}
+      - name: config-rendered
+        emptyDir: {}
+      {{- end }}

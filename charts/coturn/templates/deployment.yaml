@@ -19,6 +19,10 @@ spec:
       serviceAccountName: coturn
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: discover-ip
         image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}

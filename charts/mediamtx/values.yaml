@@ -3,7 +3,12 @@ image:
   tag: latest
   pullPolicy: IfNotPresent
 
+initImage:
+  repository: registry.access.redhat.com/ubi10/ubi-minimal
+  tag: latest
+
 coturn:
+  discovery: true
   host: ""
   port: 3478
   username: gzsim

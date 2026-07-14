@@ -17,6 +17,8 @@ ports:
   minRelay: 49152
   maxRelay: 49252
 
+nodeSelector: {}
+
 resources:
   requests:
     cpu: 250m
