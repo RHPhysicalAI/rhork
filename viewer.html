@@ -645,6 +645,67 @@
       font-family: system-ui, sans-serif;
     }
     .stream-watch-btn:hover { background: #3d7317; color: #fff; }
+
+    /* PTZ controls */
+    .ptz-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: auto;
+    }
+    .ptz-label {
+      font-size: 10px;
+      color: #6a6e73;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      font-weight: 500;
+    }
+    .ptz-dpad {
+      display: grid;
+      grid-template-columns: 22px 22px 22px;
+      grid-template-rows: 22px 22px 22px;
+      gap: 2px;
+    }
+    .ptz-btn {
+      width: 22px;
+      height: 22px;
+      border: 1px solid #d2d2d2;
+      background: #fff;
+      border-radius: 3px;
+      font-size: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      color: #383838;
+      transition: all 0.1s;
+    }
+    .ptz-btn:hover { background: #f0f0f0; border-color: #aaa; }
+    .ptz-btn:active { background: #e0e0e0; }
+    .ptz-dpad-center {
+      width: 22px;
+      height: 22px;
+      background: #f5f5f5;
+      border-radius: 3px;
+      border: 1px solid #eee;
+    }
+    .ptz-zoom {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ptz-zoom .ptz-btn { font-weight: 700; font-size: 12px; }
+    .ptz-step {
+      font-size: 10px;
+      padding: 2px 4px;
+      border: 1px solid #d2d2d2;
+      border-radius: 3px;
+      color: #383838;
+      background: #fff;
+      font-family: system-ui, sans-serif;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -695,7 +756,6 @@
         <div id="video-footer">
           <div id="video-status">
             <span id="video-info">Waiting for camera...</span>
-            <span><button id="stop-btn" class="btn-danger" style="display:none" onclick="stopStream()">Stop Stream</button></span>
           </div>
           <div id="streams-panel" class="streams-list"></div>
         </div>
@@ -709,6 +769,10 @@
     const WS_URL = (_injectedWs && _injectedWs !== '__' + 'WS_URL' + '__')
         ? _injectedWs : 'ws://localhost:9002';
     const STREAM_CONTROL_TOPIC = '/stream/control';
+    const PTZ_TOPIC = '/camera/ptz';
+    const PTZ_LIST_TOPIC = '/camera/ptz/list';
+    let ptzCameras = new Set();
+    let ptzStepDeg = 5;
     const MEDIAMTX_BASE = '__MEDIAMTX_BASE__' !== '__' + 'MEDIAMTX_BASE' + '__'
         ? '__MEDIAMTX_BASE__' : 'http://localhost:8889';
     const MEDIAMTX_API = '__MEDIAMTX_API__' !== '__' + 'MEDIAMTX_API' + '__'
@@ -730,9 +794,6 @@
     };
 
     const statusEl = document.getElementById('status');
-    const videoInfoEl = document.getElementById('video-info');
-    const stopBtn = document.getElementById('stop-btn');
-
     function setStatus(text, cls) {
       statusEl.textContent = text;
       statusEl.className = cls;
@@ -918,7 +979,13 @@
       ws = new WebSocket(WS_URL);
       ws.binaryType = 'arraybuffer';
 
-      ws.onopen = () => { ws.send('auth,,,'); };
+      ws.onopen = () => {
+        // gz-sim auto-authorizes when no auth key is configured and does not
+        // send "authorized" back, so skip the auth handshake and go straight
+        // to requesting proto definitions.
+        connectPhase = 'protos';
+        ws.send('protos,,,');
+      };
 
       ws.onclose = () => {
         setStatus('Disconnected', 'disconnected');
@@ -935,17 +1002,6 @@
         const raw = (event.data instanceof ArrayBuffer)
           ? new Uint8Array(event.data)
           : new TextEncoder().encode(event.data);
-
-        if (connectPhase === 'auth') {
-          const text = new TextDecoder().decode(raw);
-          if (text === 'authorized') {
-            connectPhase = 'protos';
-            ws.send('protos,,,');
-          } else {
-            setStatus('Auth failed', 'disconnected');
-          }
-          return;
-        }
 
         if (connectPhase === 'protos') {
           const text = new TextDecoder().decode(raw);
@@ -995,16 +1051,11 @@
 
       ws = new WebSocket(url);
       ws.binaryType = 'arraybuffer';
-      ws.onopen = () => { ws.send('auth,,,'); };
+      ws.onopen = () => { connectPhase = 'protos'; ws.send('protos,,,'); };
       ws.onclose = () => { setStatus('Disconnected', 'disconnected'); connectPhase = 'idle'; ws = null; stopStreamsPoll(); };
       ws.onerror = () => { setStatus('Connection error', 'disconnected'); };
       ws.onmessage = (event) => {
         const raw = (event.data instanceof ArrayBuffer) ? new Uint8Array(event.data) : new TextEncoder().encode(event.data);
-        if (connectPhase === 'auth') {
-          if (new TextDecoder().decode(raw) === 'authorized') { connectPhase = 'protos'; ws.send('protos,,,'); }
-          else { setStatus('Auth failed', 'disconnected'); }
-          return;
-        }
         if (connectPhase === 'protos') {
           try { protoRoot = protobuf.parse(new TextDecoder().decode(raw), { keepCase: true }).root; connectPhase = 'ready'; setStatus('Connected', 'connected'); ws.send('topics-types,,,'); startStreamsPoll(); }
           catch (e) { setStatus('Proto parse failed', 'disconnected'); }
@@ -1055,6 +1106,8 @@
 
       if (frame.topic === 'topics-types') {
         handleTopicTypes(payload, frame.type);
+      } else if (frame.topic === PTZ_LIST_TOPIC) {
+        handlePTZList(payload, frame.type);
       } else if (subscriptions[frame.topic]) {
         handleSubscriptionData(frame.topic, frame.type, payload);
       }
@@ -1076,6 +1129,7 @@
           });
         }
         renderTopicTree();
+        ws.send('sub,' + PTZ_LIST_TOPIC + ',,');
 
         if (!autoStreamDone) {
           autoStreamDone = true;
@@ -1090,6 +1144,19 @@
         }
       } catch (e) {
         console.error('Failed to decode topics-types:', e);
+      }
+    }
+
+    function handlePTZList(payload, type) {
+      if (!protoRoot) return;
+      try {
+        const MsgType = protoRoot.lookup(type);
+        const msg = MsgType.decode(payload);
+        ptzCameras = new Set(msg.data || []);
+        console.log('PTZ cameras:', [...ptzCameras]);
+        renderVideoFooter();
+      } catch (e) {
+        console.error('Failed to decode PTZ list:', e);
       }
     }
 
@@ -1526,25 +1593,45 @@
       }
     }
 
+    function publishPTZ(cameraName, dPan, dTilt, dFov) {
+      if (!ws || ws.readyState !== WebSocket.OPEN || !protoRoot) return;
+
+      try {
+        const StringMsgV = protoRoot.lookup('gz.msgs.StringMsg_V');
+        const msg = StringMsgV.create({ data: ['ptz', cameraName, String(dPan), String(dTilt), String(dFov)] });
+        const payload = StringMsgV.encode(msg).finish();
+
+        const header = 'req,' + PTZ_TOPIC + ',gz.msgs.StringMsg_V,';
+        const headerBytes = new TextEncoder().encode(header);
+        const frame = new Uint8Array(headerBytes.length + payload.length);
+        frame.set(headerBytes);
+        frame.set(payload, headerBytes.length);
+        ws.send(frame.buffer);
+        console.log('PTZ control:', cameraName, 'pan=' + dPan, 'tilt=' + dTilt, 'fov=' + dFov);
+      } catch (e) {
+        console.error('Failed to send PTZ control:', e);
+      }
+    }
+
     function startStream(topic) {
       if (activeStream) stopStream();
 
       const cameraName = topic.replace(/^\//, '');
-      const streamPath = cameraName.replace(/\//g, '_');
-
-      // In cluster mode, the plugin prefixes streams with the engineer name.
-      // The sim param tells us the prefix to use for WHEP playback.
-      const simSel = document.getElementById('sim-select');
       const simName = new URLSearchParams(window.location.search).get('sim');
+
+      // Strip the sim prefix if already present (e.g. from the streams panel)
+      const baseName = (simName && cameraName.startsWith(simName + '/'))
+        ? cameraName.slice(simName.length + 1)
+        : cameraName;
+      const streamPath = baseName.replace(/\//g, '_');
       const prefixedPath = simName ? simName + '/' + streamPath : streamPath;
 
       const whipUrl = MEDIAMTX_BASE + '/' + prefixedPath + '/whip';
 
-      publishStreamControl('start', cameraName, whipUrl);
+      publishStreamControl('start', baseName, whipUrl);
       activeStream = topic;
 
-      videoInfoEl.innerHTML = 'Starting <span class="stream-name">' + escHtml(topic) + '</span>...';
-      stopBtn.style.display = '';
+      renderVideoFooter();
 
       connectWebRTCWithRetry(prefixedPath, 5);
       renderTopicTree();
@@ -1553,14 +1640,86 @@
     function stopStream() {
       if (!activeStream) return;
       const cameraName = activeStream.replace(/^\//, '');
-      publishStreamControl('stop', cameraName);
+      const simName = new URLSearchParams(window.location.search).get('sim');
+      const baseName = (simName && cameraName.startsWith(simName + '/'))
+        ? cameraName.slice(simName.length + 1)
+        : cameraName;
+      publishStreamControl('stop', baseName);
 
       disconnectWebRTC();
       activeStream = null;
 
-      videoInfoEl.textContent = 'Stream stopped';
-      stopBtn.style.display = 'none';
+      renderVideoFooter();
       renderTopicTree();
+    }
+
+    function renderVideoFooter() {
+      const el = document.getElementById('video-status');
+      if (!el) return;
+
+      if (!activeStream) {
+        el.innerHTML = '<span>Stream stopped</span>';
+        return;
+      }
+
+      // Determine the PTZ name for this camera by flexible matching
+      let ptzName = null;
+      const cameraName = activeStream.replace(/^\//, '');
+      for (const name of ptzCameras) {
+        // Exact match
+        if (name === cameraName || name === '/' + cameraName) {
+          ptzName = name;
+          break;
+        }
+        // Suffix match: plugin uses scoped names like "camera::link::camera"
+        if (name.endsWith('::' + cameraName) || name.endsWith('/' + cameraName)) {
+          ptzName = name;
+          break;
+        }
+        // Substring match: camera name appears as a segment
+        const segments = cameraName.split('/');
+        for (const seg of segments) {
+          if (seg && name.includes(seg)) {
+            ptzName = name;
+            break;
+          }
+        }
+        if (ptzName) break;
+      }
+
+      const isPTZ = !!ptzName;
+
+      let html = '<span>Playing <span class="stream-name">' + escHtml(activeStream) + '</span></span>';
+
+      if (isPTZ) {
+        html += `<div class="ptz-controls">
+          <span class="ptz-label">PTZ</span>
+          <div class="ptz-dpad">
+            <div></div>
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', 0, -ptzStepDeg, 0)" title="Tilt up">&#9650;</button>
+            <div></div>
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', ptzStepDeg, 0, 0)" title="Pan left">&#9664;</button>
+            <div class="ptz-dpad-center"></div>
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', -ptzStepDeg, 0, 0)" title="Pan right">&#9654;</button>
+            <div></div>
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', 0, ptzStepDeg, 0)" title="Tilt down">&#9660;</button>
+            <div></div>
+          </div>
+          <div class="ptz-zoom">
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', 0, 0, -ptzStepDeg)" title="Zoom in">+</button>
+            <button class="ptz-btn" onclick="publishPTZ('${escAttr(ptzName)}', 0, 0, ptzStepDeg)" title="Zoom out">&minus;</button>
+          </div>
+          <select class="ptz-step" onchange="ptzStepDeg = Number(this.value)" title="Step size">
+            <option value="3"${ptzStepDeg === 3 ? ' selected' : ''}>3&deg;</option>
+            <option value="5"${ptzStepDeg === 5 ? ' selected' : ''}>5&deg;</option>
+            <option value="10"${ptzStepDeg === 10 ? ' selected' : ''}>10&deg;</option>
+          </select>
+        </div>`;
+      }
+
+      html += ' <button class="btn-danger" onclick="stopStream()">Stop Stream</button>';
+
+      el.innerHTML = html;
     }
 
     // -- WebRTC playback via MediaMTX WHEP --
@@ -1569,12 +1728,16 @@
       for (let i = 0; i < maxRetries; i++) {
         await new Promise(r => setTimeout(r, i === 0 ? 4000 : 3000));
         if (!activeStream) return;
-        videoInfoEl.innerHTML = 'Connecting <span class="stream-name">/' + escHtml(streamPath) +
+        const statusEl2 = document.getElementById('video-status');
+        const infoSpan = statusEl2 && statusEl2.querySelector('span:first-child') || statusEl2;
+        if (infoSpan) infoSpan.innerHTML = 'Connecting <span class="stream-name">/' + escHtml(streamPath) +
           '</span> (attempt ' + (i + 1) + '/' + maxRetries + ')...';
         const ok = await connectWebRTC(streamPath);
         if (ok) return;
       }
-      videoInfoEl.textContent = 'Failed to connect after ' + maxRetries + ' attempts';
+      const statusEl3 = document.getElementById('video-status');
+      const failSpan = statusEl3 && statusEl3.querySelector('span:first-child') || statusEl3;
+      if (failSpan) failSpan.innerHTML = 'Failed to connect after ' + maxRetries + ' attempts';
     }
 
     async function connectWebRTC(streamPath) {
@@ -1608,14 +1771,15 @@
 
         webrtcPc.ontrack = (event) => {
           videoEl.srcObject = event.streams[0];
-          videoInfoEl.innerHTML = 'Playing <span class="stream-name">/' +
-            escHtml(streamPath) + '</span> - H.264 via WebRTC';
+          renderVideoFooter();
         };
 
         webrtcPc.oniceconnectionstatechange = () => {
           if (webrtcPc && (webrtcPc.iceConnectionState === 'disconnected' ||
               webrtcPc.iceConnectionState === 'failed')) {
-            videoInfoEl.textContent = 'WebRTC disconnected';
+            const statusEl4 = document.getElementById('video-status');
+            const iceSpan = statusEl4 && statusEl4.querySelector('span:first-child') || statusEl4;
+            if (iceSpan) iceSpan.innerHTML = 'WebRTC disconnected';
           }
         };
 

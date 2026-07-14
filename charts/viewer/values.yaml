@@ -7,6 +7,9 @@ mediamtx:
   base: ""
   api: ""
 
+gz:
+  wsUrl: ""
+
 route:
   enabled: true
 

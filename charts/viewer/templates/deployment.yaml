@@ -26,5 +26,7 @@ spec:
           value: {{ .Values.mediamtx.base | quote }}
         - name: MEDIAMTX_API
           value: {{ .Values.mediamtx.api | quote }}
+        - name: WS_URL
+          value: {{ .Values.gz.wsUrl | quote }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
