@@ -19,6 +19,8 @@ ports:
 
 nodeSelector: {}
 
+tolerations: []
+
 resources:
   requests:
     cpu: 250m

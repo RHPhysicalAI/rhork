@@ -23,6 +23,10 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       initContainers:
       - name: discover-ip
         image: {{ .Values.initImage.repository }}:{{ .Values.initImage.tag }}
